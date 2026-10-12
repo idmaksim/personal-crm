@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { desc, ilike, or, sql } from "drizzle-orm";
+import { desc, or, sql, type Column, type SQL } from "drizzle-orm";
 import { ChevronLeft, ChevronRight, Mail, Phone } from "lucide-react";
 import { db } from "@/db";
 import { contacts } from "@/db/schema";
@@ -10,6 +10,22 @@ import { Button } from "@/components/ui/button";
 
 const PAGE_SIZE = 50;
 
+// Case-insensitive substring match that also treats "е" and "ё" as the same
+// letter. We lower-case both sides and fold "ё" into "е" so e.g. "Федоров"
+// finds "Фёдоров". The pattern is compared with ESCAPE '\' so that any "%" or
+// "_" the user typed (escaped in buildPattern) is matched literally instead of
+// acting as a SQL wildcard.
+function fuzzyMatch(column: Column, pattern: string): SQL {
+  return sql`translate(lower(${column}), 'ё', 'е') like translate(lower(${pattern}), 'ё', 'е') escape '\'`;
+}
+
+// Turn raw user input into a LIKE pattern, escaping the wildcards "%", "_" and
+// the escape char "\" itself so they match literally.
+function buildPattern(query: string): string {
+  const escaped = query.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+  return `%${escaped}%`;
+}
+
 export default async function Home({
   searchParams,
 }: {
@@ -19,11 +35,12 @@ export default async function Home({
   const query = q?.trim() ?? "";
   const currentPage = Math.max(1, Number(page) || 1);
 
+  const pattern = buildPattern(query);
   const where = query
     ? or(
-        ilike(contacts.name, `%${query}%`),
-        ilike(contacts.phone, `%${query}%`),
-        ilike(contacts.email, `%${query}%`),
+        fuzzyMatch(contacts.name, pattern),
+        fuzzyMatch(contacts.phone, pattern),
+        fuzzyMatch(contacts.email, pattern),
       )
     : undefined;
 
