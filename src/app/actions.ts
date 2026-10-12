@@ -7,6 +7,19 @@ import { contacts, notes } from "@/db/schema";
 
 export type ActionState = { error?: string } | undefined;
 
+// Log that a database operation failed, without ever touching the data we tried
+// to save. A raw Postgres error can carry the query parameters and the offending
+// value (name, phone, email, note body) inside .message, .detail, .query and
+// .parameters; logging the whole error would leak personal data into server logs.
+// So we log only the operation name and the Postgres error code (SQLSTATE).
+function logDbError(operation: string, error: unknown) {
+  const code =
+    typeof error === "object" && error !== null && "code" in error
+      ? String((error as { code: unknown }).code)
+      : "unknown";
+  console.error(`DB operation "${operation}" failed (code: ${code})`);
+}
+
 export async function createContact(
   _prevState: ActionState,
   formData: FormData,
@@ -20,18 +33,25 @@ export async function createContact(
     return { error: "Укажите имя контакта" };
   }
 
-  const [created] = await db
-    .insert(contacts)
-    .values({
-      name,
-      relationship: relationship || null,
-      phone: phone || null,
-      email: email || null,
-    })
-    .returning({ id: contacts.id });
+  let createdId: number;
+  try {
+    const [created] = await db
+      .insert(contacts)
+      .values({
+        name,
+        relationship: relationship || null,
+        phone: phone || null,
+        email: email || null,
+      })
+      .returning({ id: contacts.id });
+    createdId = created.id;
+  } catch (error) {
+    logDbError("createContact", error);
+    return { error: "Не удалось сохранить контакт. Попробуйте ещё раз." };
+  }
 
   revalidatePath("/");
-  redirect(`/contacts/${created.id}`);
+  redirect(`/contacts/${createdId}`);
 }
 
 export async function addNote(
@@ -48,7 +68,12 @@ export async function addNote(
     return { error: "Заметка не может быть пустой" };
   }
 
-  await db.insert(notes).values({ contactId, body });
+  try {
+    await db.insert(notes).values({ contactId, body });
+  } catch (error) {
+    logDbError("addNote", error);
+    return { error: "Не удалось сохранить заметку. Попробуйте ещё раз." };
+  }
 
   revalidatePath(`/contacts/${contactId}`);
   return undefined;
