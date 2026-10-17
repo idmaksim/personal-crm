@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { contacts } from "@/db/schema";
 import { SearchBox } from "@/components/search-box";
 import { AddContactForm } from "@/components/add-contact-form";
+import { Avatar } from "@/components/avatar";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -96,15 +97,18 @@ export default async function Home({
           {rows.map((c) => (
             <li key={c.id}>
               <Link href={`/contacts/${c.id}`} className="block">
-                <Card className="p-4 transition-colors hover:bg-accent">
+                <Card className="p-4 shadow-none transition-colors hover:bg-accent">
                   <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                      <p className="truncate font-medium">{c.name}</p>
-                      {c.relationship ? (
-                        <p className="truncate text-sm text-muted-foreground">
-                          {c.relationship}
-                        </p>
-                      ) : null}
+                    <div className="flex min-w-0 items-center gap-3">
+                      <Avatar name={c.name} />
+                      <div className="min-w-0">
+                        <p className="truncate font-semibold">{c.name}</p>
+                        {c.relationship ? (
+                          <p className="truncate text-sm text-muted-foreground">
+                            {c.relationship}
+                          </p>
+                        ) : null}
+                      </div>
                     </div>
                     <div className="hidden shrink-0 flex-col items-end gap-1 text-sm text-muted-foreground sm:flex">
                       {c.phone ? (

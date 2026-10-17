@@ -5,6 +5,7 @@ import { ArrowLeft, Mail, Phone } from "lucide-react";
 import { db } from "@/db";
 import { contacts, notes } from "@/db/schema";
 import { NoteForm } from "@/components/note-form";
+import { Avatar } from "@/components/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
 function formatDate(date: Date) {
@@ -51,10 +52,17 @@ export default async function ContactPage({
 
       <Card>
         <CardHeader>
-          <CardTitle className="text-2xl">{contact.name}</CardTitle>
-          {contact.relationship ? (
-            <p className="text-sm text-muted-foreground">{contact.relationship}</p>
-          ) : null}
+          <div className="flex items-center gap-4">
+            <Avatar name={contact.name} className="size-12 text-base" />
+            <div className="min-w-0">
+              <CardTitle className="text-2xl">{contact.name}</CardTitle>
+              {contact.relationship ? (
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {contact.relationship}
+                </p>
+              ) : null}
+            </div>
+          </div>
         </CardHeader>
         <CardContent className="space-y-2 text-sm">
           {contact.phone ? (
