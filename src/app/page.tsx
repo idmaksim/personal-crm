@@ -9,6 +9,10 @@ import { Avatar } from "@/components/avatar";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
+// Always render on request against the live database; never prerender at build
+// time (the build runs without DATABASE_URL).
+export const dynamic = "force-dynamic";
+
 const PAGE_SIZE = 50;
 
 // Case-insensitive substring match that also treats "е" and "ё" as the same

@@ -8,6 +8,10 @@ import { NoteForm } from "@/components/note-form";
 import { Avatar } from "@/components/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
+// Always render on request against the live database; never prerender at build
+// time (the build runs without DATABASE_URL).
+export const dynamic = "force-dynamic";
+
 function formatDate(date: Date) {
   return new Intl.DateTimeFormat("ru-RU", {
     day: "numeric",

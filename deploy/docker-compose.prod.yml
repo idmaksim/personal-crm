@@ -1,0 +1,59 @@
+# Production stack on the server. Run with project name "prod":
+#   docker compose -p prod -f docker-compose.prod.yml ...
+#
+# Secrets live in ./.env (next to this file), which is created on the server by
+# hand and is NOT in git. APP_IMAGE is passed by deploy.sh at deploy time.
+
+services:
+  # The app's own database, reachable only inside this compose network.
+  postgres:
+    image: postgres:18
+    container_name: prod-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # The web app. Published only on localhost; nginx proxies to it.
+  app:
+    image: ${APP_IMAGE}
+    container_name: prod-app
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "127.0.0.1:3000:3000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # One-shot migration runner (same image). Not started by `up`; the deploy
+  # runs it explicitly with `run --rm` before starting the app.
+  migrate:
+    image: ${APP_IMAGE}
+    profiles: ["tools"]
+    env_file: .env
+    command: ["node", "src/db/migrate.mjs"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  postgres_data:
