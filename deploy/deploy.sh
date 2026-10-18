@@ -23,6 +23,11 @@ fi
 export APP_IMAGE="$IMAGE"
 COMPOSE=(docker compose -p prod -f docker-compose.prod.yml)
 
+# Read PUBLIC_APP_URL from .env for the public smoke test below. We grep just
+# this one key instead of sourcing .env, since .env also holds secrets whose
+# values are not safe to eval as shell.
+PUBLIC_APP_URL="$(grep -E '^PUBLIC_APP_URL=' .env | tail -n1 | cut -d= -f2- | tr -d '\r')"
+
 echo "==> Pulling image: $IMAGE"
 "${COMPOSE[@]}" pull app
 
