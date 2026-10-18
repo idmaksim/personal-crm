@@ -51,6 +51,35 @@ if [ "$ok" != "1" ]; then
 fi
 echo "    /health returned 200 — app is up"
 
+# Public smoke test: hit the app through nginx/HTTPS, not just the container.
+# This catches an nginx misconfig (e.g. app.dobrymaxx.ru serving the landing
+# page instead of the CRM) that the local 127.0.0.1:3000 test cannot see.
+# Set PUBLIC_APP_URL in ~/deploy/.env to enable it (e.g. https://app.dobrymaxx.ru).
+if [ -n "${PUBLIC_APP_URL:-}" ]; then
+  echo "==> Public smoke test: GET $PUBLIC_APP_URL/health (expect 200 + status ok)"
+  pub_ok=""
+  pub_code=""
+  pub_body=""
+  for i in $(seq 1 15); do
+    pub_body="$(curl -fsS --max-time 10 "$PUBLIC_APP_URL/health" || true)"
+    pub_code="$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$PUBLIC_APP_URL/health" || true)"
+    if [ "$pub_code" = "200" ] && printf '%s' "$pub_body" | grep -q '"status":"ok"'; then
+      pub_ok=1; break
+    fi
+    sleep 2
+  done
+  if [ "$pub_ok" != "1" ]; then
+    echo "PUBLIC SMOKE TEST FAILED (HTTP ${pub_code:-none}, body: ${pub_body:-empty})" >&2
+    echo "The container is healthy but $PUBLIC_APP_URL does not serve the CRM." >&2
+    echo "Likely an nginx issue — compare the server config with" >&2
+    echo "deploy/nginx/app.dobrymaxx.ru.conf. Rollback is manual." >&2
+    exit 1
+  fi
+  echo "    $PUBLIC_APP_URL/health returned ok — CRM is reachable from outside"
+else
+  echo "==> Public smoke test skipped (PUBLIC_APP_URL not set in .env)"
+fi
+
 echo "==> Cleaning up old images (keep the 2 newest of this repo)"
 REPO="${IMAGE%:*}"
 docker images "$REPO" --format '{{.CreatedAt}}|{{.ID}}' \
