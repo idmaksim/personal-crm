@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { contacts } from "@/db/schema";
 import { SearchBox } from "@/components/search-box";
 import { AddContactForm } from "@/components/add-contact-form";
+import { DeleteContactButton } from "@/components/delete-contact-button";
 import { Avatar } from "@/components/avatar";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -100,21 +101,26 @@ export default async function Home({
         <ul className="space-y-2">
           {rows.map((c) => (
             <li key={c.id}>
-              <Link href={`/contacts/${c.id}`} className="block">
-                <Card className="p-4 shadow-none transition-colors hover:bg-accent">
-                  <div className="flex items-start justify-between gap-4">
-                    <div className="flex min-w-0 items-center gap-3">
-                      <Avatar name={c.name} />
-                      <div className="min-w-0">
-                        <p className="truncate font-semibold">{c.name}</p>
-                        {c.relationship ? (
-                          <p className="truncate text-sm text-muted-foreground">
-                            {c.relationship}
-                          </p>
-                        ) : null}
-                      </div>
+              <Card className="relative p-4 shadow-none transition-colors hover:bg-accent">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex min-w-0 items-center gap-3">
+                    <Avatar name={c.name} />
+                    <div className="min-w-0">
+                      <Link
+                        href={`/contacts/${c.id}`}
+                        className="block truncate font-semibold after:absolute after:inset-0"
+                      >
+                        {c.name}
+                      </Link>
+                      {c.relationship ? (
+                        <p className="truncate text-sm text-muted-foreground">
+                          {c.relationship}
+                        </p>
+                      ) : null}
                     </div>
-                    <div className="hidden shrink-0 flex-col items-end gap-1 text-sm text-muted-foreground sm:flex">
+                  </div>
+                  <div className="flex shrink-0 items-center gap-3">
+                    <div className="hidden flex-col items-end gap-1 text-sm text-muted-foreground sm:flex">
                       {c.phone ? (
                         <span className="flex items-center gap-1">
                           <Phone className="size-3.5" /> {c.phone}
@@ -126,9 +132,16 @@ export default async function Home({
                         </span>
                       ) : null}
                     </div>
+                    <div className="relative z-10">
+                      <DeleteContactButton
+                        contactId={c.id}
+                        contactName={c.name}
+                        variant="icon"
+                      />
+                    </div>
                   </div>
-                </Card>
-              </Link>
+                </div>
+              </Card>
             </li>
           ))}
         </ul>

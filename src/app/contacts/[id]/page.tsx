@@ -5,6 +5,7 @@ import { ArrowLeft, Mail, Phone } from "lucide-react";
 import { db } from "@/db";
 import { contacts, notes } from "@/db/schema";
 import { NoteForm } from "@/components/note-form";
+import { DeleteContactButton } from "@/components/delete-contact-button";
 import { Avatar } from "@/components/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -56,15 +57,26 @@ export default async function ContactPage({
 
       <Card>
         <CardHeader>
-          <div className="flex items-center gap-4">
-            <Avatar name={contact.name} className="size-12 text-base" />
-            <div className="min-w-0">
-              <CardTitle className="text-2xl">{contact.name}</CardTitle>
-              {contact.relationship ? (
-                <p className="mt-1 text-sm text-muted-foreground">
-                  {contact.relationship}
-                </p>
-              ) : null}
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex min-w-0 flex-1 items-center gap-4">
+              <Avatar name={contact.name} className="size-12 shrink-0 text-base" />
+              <div className="min-w-0">
+                <CardTitle className="break-words text-2xl">
+                  {contact.name}
+                </CardTitle>
+                {contact.relationship ? (
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {contact.relationship}
+                  </p>
+                ) : null}
+              </div>
+            </div>
+            <div className="shrink-0">
+              <DeleteContactButton
+                contactId={contact.id}
+                contactName={contact.name}
+                variant="icon"
+              />
             </div>
           </div>
         </CardHeader>

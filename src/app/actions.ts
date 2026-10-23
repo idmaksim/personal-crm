@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { contacts, notes } from "@/db/schema";
 
@@ -77,4 +78,26 @@ export async function addNote(
 
   revalidatePath(`/contacts/${contactId}`);
   return undefined;
+}
+
+export async function deleteContact(
+  _prevState: ActionState,
+  formData: FormData,
+): Promise<ActionState> {
+  const contactId = Number(formData.get("contactId"));
+
+  if (!Number.isInteger(contactId)) {
+    return { error: "Контакт не найден" };
+  }
+
+  try {
+    // Notes are removed automatically by the ON DELETE cascade foreign key.
+    await db.delete(contacts).where(eq(contacts.id, contactId));
+  } catch (error) {
+    logDbError("deleteContact", error);
+    return { error: "Не удалось удалить контакт. Попробуйте ещё раз." };
+  }
+
+  revalidatePath("/");
+  redirect("/");
 }
