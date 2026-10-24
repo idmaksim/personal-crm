@@ -5,6 +5,9 @@ import { ArrowLeft, Mail, Phone } from "lucide-react";
 import { db } from "@/db";
 import { contacts, notes } from "@/db/schema";
 import { NoteForm } from "@/components/note-form";
+import { ContactFrequencyForm } from "@/components/contact-frequency-form";
+import { getLastContactAt } from "@/lib/keep-in-touch";
+import { formatShortDate, getContactTiming, pluralizeDays } from "@/lib/frequency";
 import { DeleteContactButton } from "@/components/delete-contact-button";
 import { Avatar } from "@/components/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -45,6 +48,8 @@ export default async function ContactPage({
     .from(notes)
     .where(eq(notes.contactId, contactId))
     .orderBy(desc(notes.createdAt));
+
+  const timing = getContactTiming(await getLastContactAt(contactId), contact.frequency);
 
   return (
     <div className="space-y-6">
@@ -103,6 +108,30 @@ export default async function ContactPage({
         </CardContent>
       </Card>
 
+      <Card>
+        <CardContent className="space-y-4 pt-6">
+          <ContactFrequencyForm contactId={contact.id} frequency={contact.frequency} />
+          <div className="space-y-1 text-sm">
+            <p>
+              <span className="text-muted-foreground">Последнее общение: </span>
+              {formatShortDate(timing.lastContactAt)}
+            </p>
+            {timing.nextAt ? (
+              timing.overdue ? (
+                <p className="font-medium text-accent-ink">
+                  Пора связаться — ждёт {pluralizeDays(timing.daysWaiting)}
+                </p>
+              ) : (
+                <p>
+                  <span className="text-muted-foreground">Связаться снова: </span>
+                  после {formatShortDate(timing.nextAt)}
+                </p>
+              )
+            ) : null}
+          </div>
+        </CardContent>
+      </Card>
+
       <section className="space-y-4">
         <h2 className="text-lg font-semibold">Заметки</h2>
 
@@ -114,7 +143,7 @@ export default async function ContactPage({
 
         {noteList.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            Пока нет заметок. Добавьте первую после разговора.
+            Пока нет заметок. Отметьте первый разговор кнопкой «Пообщались».
           </p>
         ) : (
           <ul className="space-y-2">
@@ -122,7 +151,9 @@ export default async function ContactPage({
               <li key={note.id}>
                 <Card>
                   <CardContent className="space-y-1 py-4">
-                    <p className="whitespace-pre-wrap text-sm">{note.body}</p>
+                    <p className="whitespace-pre-wrap text-sm">
+                      {note.body ?? "Пообщались"}
+                    </p>
                     <p className="text-xs text-muted-foreground">
                       {formatDate(note.createdAt)}
                     </p>

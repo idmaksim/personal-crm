@@ -1,11 +1,13 @@
 "use client";
 
-import { useActionState, useEffect, useRef } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
+import { MessageCircle } from "lucide-react";
 import { addNote, type ActionState } from "@/app/actions";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 
 export function NoteForm({ contactId }: { contactId: number }) {
+  const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState<ActionState, FormData>(
     addNote,
     undefined,
@@ -13,25 +15,40 @@ export function NoteForm({ contactId }: { contactId: number }) {
   const formRef = useRef<HTMLFormElement>(null);
 
   useEffect(() => {
-    // Clear the textarea after a successful submit (no error returned)
-    if (!pending && !state?.error) {
+    // Collapse and clear the form after a successful save
+    if (state?.message) {
       formRef.current?.reset();
+      setOpen(false);
     }
-  }, [pending, state]);
+  }, [state]);
+
+  if (!open) {
+    return (
+      <Button onClick={() => setOpen(true)} className="w-full sm:w-auto">
+        <MessageCircle /> Пообщались
+      </Button>
+    );
+  }
 
   return (
     <form ref={formRef} action={formAction} className="space-y-3">
       <input type="hidden" name="contactId" value={contactId} />
       <Textarea
         name="body"
-        placeholder="Дописать заметку после разговора: о чём договорились…"
+        placeholder="Как пообщались? Можно оставить пустым"
+        aria-label="Как пообщались?"
         rows={3}
-        required
+        autoFocus
       />
       {state?.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
-      <Button type="submit" disabled={pending}>
-        {pending ? "Сохраняю…" : "Добавить заметку"}
-      </Button>
+      <div className="flex gap-2">
+        <Button type="submit" disabled={pending}>
+          {pending ? "Сохраняю…" : "Сохранить"}
+        </Button>
+        <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+          Отмена
+        </Button>
+      </div>
     </form>
   );
 }
