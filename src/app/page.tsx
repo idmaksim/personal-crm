@@ -7,6 +7,8 @@ import { SearchBox } from "@/components/search-box";
 import { AddContactForm } from "@/components/add-contact-form";
 import { DeleteContactButton } from "@/components/delete-contact-button";
 import { Avatar } from "@/components/avatar";
+import { OverdueContacts } from "@/components/overdue-contacts";
+import { getOverdueContacts } from "@/lib/keep-in-touch";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -66,6 +68,8 @@ export default async function Home({
     .limit(PAGE_SIZE)
     .offset((safePage - 1) * PAGE_SIZE);
 
+  const overdue = await getOverdueContacts();
+
   const buildHref = (targetPage: number) => {
     const params = new URLSearchParams();
     if (query) params.set("q", query);
@@ -80,6 +84,8 @@ export default async function Home({
         <h1 className="text-2xl font-semibold">Контакты</h1>
         <AddContactForm />
       </div>
+
+      <OverdueContacts contacts={overdue} />
 
       <SearchBox />
 

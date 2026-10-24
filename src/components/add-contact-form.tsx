@@ -5,6 +5,7 @@ import { Plus } from "lucide-react";
 import { createContact, type ActionState } from "@/app/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { FrequencySelect } from "@/components/frequency-select";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -48,6 +49,10 @@ export function AddContactForm() {
               <Label htmlFor="email">Почта</Label>
               <Input id="email" name="email" type="email" placeholder="ivan@example.com" />
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="frequency">Как часто общаться</Label>
+            <FrequencySelect id="frequency" name="frequency" defaultValue="" />
           </div>
 
           {state?.error ? (

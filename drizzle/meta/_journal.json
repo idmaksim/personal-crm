@@ -8,6 +8,13 @@
       "when": 1791750867505,
       "tag": "0000_daffy_purifiers",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1792851713246,
+      "tag": "0001_chemical_rocket_racer",
+      "breakpoints": true
     }
   ]
 }

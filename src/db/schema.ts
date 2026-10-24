@@ -1,4 +1,14 @@
-import { pgTable, serial, text, timestamp, integer, index } from "drizzle-orm/pg-core";
+import { pgEnum, pgTable, serial, text, timestamp, integer, index } from "drizzle-orm/pg-core";
+
+// How often I want to talk to a contact; empty (null) means "not set"
+export const contactFrequency = pgEnum("contact_frequency", [
+  "weekly",
+  "monthly",
+  "quarterly",
+  "yearly",
+]);
+
+export type ContactFrequency = (typeof contactFrequency.enumValues)[number];
 
 // People I know personally
 export const contacts = pgTable(
@@ -10,6 +20,7 @@ export const contacts = pgTable(
     relationship: text("relationship"),
     phone: text("phone"),
     email: text("email"),
+    frequency: contactFrequency("frequency"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
@@ -25,7 +36,8 @@ export const notes = pgTable(
     contactId: integer("contact_id")
       .notNull()
       .references(() => contacts.id, { onDelete: "cascade" }),
-    body: text("body").notNull(),
+    // Empty (null) body means "we talked" without any details
+    body: text("body"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => ({
