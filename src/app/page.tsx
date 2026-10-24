@@ -107,7 +107,7 @@ export default async function Home({
         <ul className="space-y-2">
           {rows.map((c) => (
             <li key={c.id}>
-              <Card className="relative p-4 shadow-none transition-colors hover:bg-accent">
+              <Card className="relative p-4 shadow-none transition-colors hover:bg-band">
                 <div className="flex items-start justify-between gap-4">
                   <div className="flex min-w-0 items-center gap-3">
                     <Avatar name={c.name} />

@@ -1,31 +1,45 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "../styles/tokens.css";
 
-/* Design tokens mirror the landing page (../personal-crm-landing):
-   warm off-white canvas, Golos Text, golden-beige accents. shadcn's HSL
-   variables are mapped onto that palette so every component inherits it. */
-@layer base {
-  :root {
-    --background: 45 10% 91.8%; /* canvas */
-    --foreground: 45 8% 20%; /* ink */
-    --card: 40 100% 99.4%; /* surface */
-    --card-foreground: 45 8% 20%; /* ink */
-    --primary: 45 8% 20%; /* ink — dark button */
-    --primary-foreground: 40 100% 99.4%; /* surface */
-    --secondary: 40 26% 93.1%; /* chip background */
-    --secondary-foreground: 37 15% 47.1%; /* chip text */
-    --muted: 42 45% 94.3%; /* band */
-    --muted-foreground: 33 8% 43.5%; /* body text */
-    --accent: 42 45% 94.3%; /* band — subtle warm hover */
-    --accent-foreground: 45 8% 20%; /* ink */
-    --destructive: 9 52% 46%; /* muted terracotta */
-    --destructive-foreground: 40 100% 99.4%;
-    --border: 40 15% 88.4%; /* container border */
-    --input: 40 20% 91.2%; /* nested card border */
-    --ring: 40 55% 51.2%; /* gold accent */
-    --radius: 0.75rem;
-  }
+/* shadcn/ui semantic tokens, mapped onto the landing design tokens.
+   No colour or font values live here — only references to tokens.css
+   (../styles/tokens.css), which stays the single source of truth. */
+:root {
+  --background: var(--color-canvas);
+  --foreground: var(--color-ink);
+  --card: var(--color-surface);
+  --card-foreground: var(--color-ink);
+  --primary: var(--color-ink);
+  --primary-foreground: var(--color-surface);
+  --secondary: var(--color-chip-bg);
+  --secondary-foreground: var(--color-chip-ink);
+  --muted: var(--color-band);
+  --muted-foreground: var(--color-body);
+  --destructive: var(--color-danger);
+  --destructive-foreground: var(--color-surface);
+  --border: var(--color-border);
+  --input: var(--color-border-card);
+  --ring: var(--color-accent); /* the landing's gold accent */
+}
+
+/* "inline" keeps these utilities pointing at the aliases above instead of
+   re-emitting the landing colour names, so the landing tokens (e.g. the gold
+   --color-accent used by --ring) keep their own meaning. */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
 }
 
 @layer base {

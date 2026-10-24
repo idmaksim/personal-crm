@@ -1,0 +1,45 @@
+@import "tailwindcss";
+
+/* Design tokens — the single source for colors and font.
+   See design/README.md "Design tokens". */
+@theme {
+  --font-sans: "Golos Text", sans-serif;
+
+  --color-canvas: #ECEBE8;        /* page background */
+  --color-surface: #FFFEFC;       /* main surface (card/container) */
+  --color-surface-2: #FDFCFA;     /* nested cards */
+  --color-surface-3: #FBFAF7;     /* "Problem" / "Benefits" section bg (desktop) */
+  --color-band: #F7F3EA;          /* beige band (final CTA, reminder row) */
+  --color-bell-bg: #EFE1C4;       /* bell icon circle (mobile hero) */
+
+  --color-border: #E6E3DD;        /* container border */
+  --color-hairline: #F0EDE7;      /* thin section dividers */
+  --color-border-card: #EDEAE4;   /* nested card border */
+  --color-border-card-2: #EFECE6; /* reminder rows / source card divider */
+
+  --color-ink: #37352F;           /* headings, body text, dark button */
+  --color-ink-hover: #2B2A25;     /* button hover */
+  --color-body: #787066;          /* paragraphs */
+  --color-muted: #9B958B;         /* captions */
+  --color-muted-2: #B2ADA3;       /* quietest text (disclaimer) */
+
+  --color-danger: #B24B38;        /* destructive action / error (terracotta) */
+
+  --color-eyebrow: #B59B5E;       /* uppercase eyebrows */
+  --color-accent: #C79A3E;        /* accent dot */
+  --color-accent-ink: #A5832F;    /* text on gold chip */
+  --color-accent-bg: #F0EAD9;     /* gold chip / icon bg */
+  --color-icon-stroke: #B38A3C;   /* icon stroke (check, bell) */
+  --color-dash: #C7B486;          /* dash markers in lists */
+
+  --color-chip-bg: #F2EFE9;       /* neutral chips */
+  --color-chip-ink: #8A7C66;      /* neutral chip text */
+
+  /* avatars */
+  --color-av-gold-bg: #EFE9DE;
+  --color-av-gold-ink: #9A8C6E;
+  --color-av-green-bg: #E7EEE8;
+  --color-av-green-ink: #6E8A76;
+  --color-av-purple-bg: #EAE5F0;
+  --color-av-purple-ink: #857399;
+}
