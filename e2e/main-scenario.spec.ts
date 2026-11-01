@@ -48,7 +48,9 @@ test("главный сценарий: открыл → добавил → на�
 
   // 2b. Back to the list and find the contact by name via search.
   await page.goto("/");
-  await page.getByRole("searchbox", { name: "Поиск контактов" }).fill(contactName);
+  await page
+    .getByRole("searchbox", { name: "Поиск контактов" })
+    .fill(contactName);
   const contactLink = page.getByRole("link", { name: contactName });
   await expect(contactLink).toBeVisible();
 

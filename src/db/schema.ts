@@ -32,7 +32,9 @@ export const contacts = pgTable(
     phone: text("phone"),
     email: text("email"),
     frequency: contactFrequency("frequency"),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
   (table) => ({
     nameIdx: index("contacts_name_idx").on(table.name),
@@ -49,7 +51,9 @@ export const notes = pgTable(
       .references(() => contacts.id, { onDelete: "cascade" }),
     // Empty (null) body means "we talked" without any details
     body: text("body"),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
   (table) => ({
     contactIdx: index("notes_contact_id_idx").on(table.contactId),
@@ -62,7 +66,9 @@ export const groups = pgTable(
   {
     id: serial("id").primaryKey(),
     name: text("name").notNull(),
-    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
   },
   (table) => ({
     // Unique name, case-insensitive and folding "ё" into "е" — the same

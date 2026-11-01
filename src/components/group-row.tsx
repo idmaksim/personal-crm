@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useState } from "react";
+import { useActionState, useState } from "react";
 import { Check, Pencil, Trash2, X } from "lucide-react";
 import { renameGroup, deleteGroup, type ActionState } from "@/app/actions";
 import { Button } from "@/components/ui/button";
@@ -28,16 +28,23 @@ export function GroupRow({ group, contactCount }: GroupRowProps) {
     FormData
   >(renameGroup, undefined);
 
-  useEffect(() => {
-    // Leave edit mode after a successful rename.
-    if (renameState?.message) setEditing(false);
-  }, [renameState]);
+  // Leave edit mode after a successful rename. Adjusting state during render
+  // (guarded so it runs once per new result) is React's recommended alternative
+  // to calling setState inside an effect.
+  const [handled, setHandled] = useState<ActionState>(undefined);
+  if (renameState?.message && renameState !== handled) {
+    setHandled(renameState);
+    setEditing(false);
+  }
 
   return (
     <div className="space-y-2 p-4">
       <div className="flex items-center justify-between gap-3">
         {editing ? (
-          <form action={renameAction} className="flex flex-1 items-center gap-2">
+          <form
+            action={renameAction}
+            className="flex flex-1 items-center gap-2"
+          >
             <input type="hidden" name="groupId" value={group.id} />
             <Input
               name="name"
@@ -71,7 +78,9 @@ export function GroupRow({ group, contactCount }: GroupRowProps) {
             <div className="min-w-0">
               <p className="truncate font-medium">{group.name}</p>
               <p className="text-xs text-muted-foreground">
-                {contactCount > 0 ? `Контактов: ${contactCount}` : "Нет контактов"}
+                {contactCount > 0
+                  ? `Контактов: ${contactCount}`
+                  : "Нет контактов"}
               </p>
             </div>
             <div className="flex shrink-0 items-center gap-1">
@@ -98,7 +107,13 @@ export function GroupRow({ group, contactCount }: GroupRowProps) {
   );
 }
 
-function DeleteGroupButton({ groupId, name }: { groupId: number; name: string }) {
+function DeleteGroupButton({
+  groupId,
+  name,
+}: {
+  groupId: number;
+  name: string;
+}) {
   const [state, formAction, pending] = useActionState<ActionState, FormData>(
     deleteGroup,
     undefined,

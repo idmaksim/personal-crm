@@ -25,7 +25,9 @@ export function GroupFilter({ selected, candidates }: GroupFilterProps) {
   const [pending, startTransition] = useTransition();
   const [expanded, setExpanded] = useState(false);
   const chipsRef = useRef<HTMLDivElement>(null);
-  const [clamp, setClamp] = useState<{ height: number; hidden: number } | null>(null);
+  const [clamp, setClamp] = useState<{ height: number; hidden: number } | null>(
+    null,
+  );
 
   const selectedIds = new Set(selected.map((g) => g.id));
 
@@ -59,7 +61,9 @@ export function GroupFilter({ selected, candidates }: GroupFilterProps) {
         setClamp(null);
         return;
       }
-      const tops = [...new Set(children.map((c) => c.offsetTop))].sort((a, b) => a - b);
+      const tops = [...new Set(children.map((c) => c.offsetTop))].sort(
+        (a, b) => a - b,
+      );
       if (tops.length <= 2) {
         setClamp(null);
         return;

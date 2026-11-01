@@ -45,7 +45,10 @@ export function DeleteContactButton({
             <Trash2 />
           </Button>
         ) : (
-          <Button variant="outline" className="text-destructive hover:bg-destructive/10">
+          <Button
+            variant="outline"
+            className="text-destructive hover:bg-destructive/10"
+          >
             <Trash2 /> Удалить
           </Button>
         )}

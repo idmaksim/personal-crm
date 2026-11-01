@@ -5,7 +5,11 @@ import { redirect } from "next/navigation";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { contacts, notes, groups, contactGroups } from "@/db/schema";
-import { formatShortDate, isContactFrequency, nextContactDate } from "@/lib/frequency";
+import {
+  formatShortDate,
+  isContactFrequency,
+  nextContactDate,
+} from "@/lib/frequency";
 
 // A Drizzle transaction handle, inferred from db.transaction's callback. Used by
 // the group helpers so they can run inside a larger transaction.
@@ -22,7 +26,10 @@ function sameNormalizedName(name: string) {
 // `name` must already be trimmed and non-empty. The unique index is the final
 // guard against a race: if a concurrent insert wins, onConflictDoNothing yields
 // no row and we fall back to a second lookup.
-async function findOrCreateGroup(tx: DbTransaction, name: string): Promise<number> {
+async function findOrCreateGroup(
+  tx: DbTransaction,
+  name: string,
+): Promise<number> {
   const [existing] = await tx
     .select({ id: groups.id })
     .from(groups)

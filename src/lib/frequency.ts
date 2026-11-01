@@ -29,13 +29,20 @@ function addMonths(date: Date, months: number): Date {
   const day = result.getDate();
   result.setDate(1);
   result.setMonth(result.getMonth() + months);
-  const lastDay = new Date(result.getFullYear(), result.getMonth() + 1, 0).getDate();
+  const lastDay = new Date(
+    result.getFullYear(),
+    result.getMonth() + 1,
+    0,
+  ).getDate();
   result.setDate(Math.min(day, lastDay));
   return result;
 }
 
 // When we should talk to the contact again, counted from the last conversation.
-export function nextContactDate(lastContactAt: Date, frequency: ContactFrequency): Date {
+export function nextContactDate(
+  lastContactAt: Date,
+  frequency: ContactFrequency,
+): Date {
   switch (frequency) {
     case "weekly":
       return new Date(lastContactAt.getTime() + 7 * DAY_MS);

@@ -31,7 +31,13 @@ export function AddContactForm({ allGroups }: { allGroups: string[] }) {
         <form action={formAction} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="name">Имя *</Label>
-            <Input id="name" name="name" placeholder="Иван Петров" autoFocus required />
+            <Input
+              id="name"
+              name="name"
+              placeholder="Иван Петров"
+              autoFocus
+              required
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="relationship">Откуда знакомы</Label>
@@ -48,7 +54,12 @@ export function AddContactForm({ allGroups }: { allGroups: string[] }) {
             </div>
             <div className="space-y-2">
               <Label htmlFor="email">Почта</Label>
-              <Input id="email" name="email" type="email" placeholder="ivan@example.com" />
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                placeholder="ivan@example.com"
+              />
             </div>
           </div>
           <div className="space-y-2">
@@ -66,7 +77,11 @@ export function AddContactForm({ allGroups }: { allGroups: string[] }) {
             <Button type="submit" disabled={pending}>
               {pending ? "Сохраняю…" : "Сохранить"}
             </Button>
-            <Button type="button" variant="ghost" onClick={() => setOpen(false)}>
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={() => setOpen(false)}
+            >
               Отмена
             </Button>
           </div>

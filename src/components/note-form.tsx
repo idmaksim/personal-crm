@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useEffect, useRef, useState } from "react";
+import { useActionState, useState } from "react";
 import { MessageCircle } from "lucide-react";
 import { addNote, type ActionState } from "@/app/actions";
 import { Button } from "@/components/ui/button";
@@ -12,15 +12,16 @@ export function NoteForm({ contactId }: { contactId: number }) {
     addNote,
     undefined,
   );
-  const formRef = useRef<HTMLFormElement>(null);
 
-  useEffect(() => {
-    // Collapse and clear the form after a successful save
-    if (state?.message) {
-      formRef.current?.reset();
-      setOpen(false);
-    }
-  }, [state]);
+  // Collapse the form right after a successful save. Adjusting state during
+  // render (guarded so it runs once per new result) is React's recommended
+  // alternative to calling setState inside an effect. Collapsing unmounts the
+  // form, so the textarea starts empty again next time it opens.
+  const [handled, setHandled] = useState<ActionState>(undefined);
+  if (state?.message && state !== handled) {
+    setHandled(state);
+    setOpen(false);
+  }
 
   if (!open) {
     return (
@@ -31,7 +32,7 @@ export function NoteForm({ contactId }: { contactId: number }) {
   }
 
   return (
-    <form ref={formRef} action={formAction} className="space-y-3">
+    <form action={formAction} className="space-y-3">
       <input type="hidden" name="contactId" value={contactId} />
       <Textarea
         name="body"
@@ -40,7 +41,9 @@ export function NoteForm({ contactId }: { contactId: number }) {
         rows={3}
         autoFocus
       />
-      {state?.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
+      {state?.error ? (
+        <p className="text-sm text-destructive">{state.error}</p>
+      ) : null}
       <div className="flex gap-2">
         <Button type="submit" disabled={pending}>
           {pending ? "Сохраняю…" : "Сохранить"}

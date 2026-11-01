@@ -35,7 +35,9 @@ export function GroupCombobox({
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
   const listId = useId();
-  const blurTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const blurTimer = useRef<ReturnType<typeof setTimeout> | undefined>(
+    undefined,
+  );
 
   const excludeKeys = new Set(exclude.map(normalize));
   const valueKey = normalize(value);

@@ -74,7 +74,15 @@ async function main() {
       phone: hasPhone ? faker.phone.number() : null,
       email: hasEmail
         ? faker.internet
-            .email({ firstName: faker.string.alphanumeric(6), provider: pick(["gmail.com", "mail.ru", "yandex.ru", "outlook.com"]) })
+            .email({
+              firstName: faker.string.alphanumeric(6),
+              provider: pick([
+                "gmail.com",
+                "mail.ru",
+                "yandex.ru",
+                "outlook.com",
+              ]),
+            })
             .toLowerCase()
         : null,
       createdAt: faker.date.past({ years: 3 }),
@@ -86,7 +94,10 @@ async function main() {
   const batchSize = 200;
   for (let i = 0; i < contactRows.length; i += batchSize) {
     const batch = contactRows.slice(i, i + batchSize);
-    const rows = await db.insert(contacts).values(batch).returning({ id: contacts.id });
+    const rows = await db
+      .insert(contacts)
+      .values(batch)
+      .returning({ id: contacts.id });
     insertedIds.push(...rows.map((r) => r.id));
   }
 
@@ -111,7 +122,9 @@ async function main() {
     await db.insert(notes).values(batch);
   }
 
-  console.log(`Done. Inserted ${insertedIds.length} contacts and ${noteRows.length} notes.`);
+  console.log(
+    `Done. Inserted ${insertedIds.length} contacts and ${noteRows.length} notes.`,
+  );
   await client.end();
 }
 

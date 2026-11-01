@@ -1,5 +1,15 @@
 import Link from "next/link";
-import { and, desc, eq, inArray, notInArray, or, sql, type Column, type SQL } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  inArray,
+  notInArray,
+  or,
+  sql,
+  type Column,
+  type SQL,
+} from "drizzle-orm";
 import { ChevronLeft, ChevronRight, Mail, Phone } from "lucide-react";
 import { db } from "@/db";
 import { contacts, groups, contactGroups } from "@/db/schema";
@@ -50,7 +60,11 @@ function parseGroupIds(raw: string | string[] | undefined): number[] {
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; page?: string; group?: string | string[] }>;
+  searchParams: Promise<{
+    q?: string;
+    page?: string;
+    group?: string | string[];
+  }>;
 }) {
   const { q, page, group } = await searchParams;
   const query = q?.trim() ?? "";
@@ -66,7 +80,9 @@ export default async function Home({
   // silently dropped, so the list does not break when a group disappears).
   const existingGroupIds = new Set(allGroups.map((g) => g.id));
   const requestedGroupIds = parseGroupIds(group);
-  const selectedGroupIds = requestedGroupIds.filter((id) => existingGroupIds.has(id));
+  const selectedGroupIds = requestedGroupIds.filter((id) =>
+    existingGroupIds.has(id),
+  );
 
   const pattern = buildPattern(query);
   const searchWhere = query
@@ -116,7 +132,10 @@ export default async function Home({
           ),
         )
         .groupBy(groups.id)
-        .orderBy(sql`count(distinct ${contactGroups.contactId}) desc`, groups.name)
+        .orderBy(
+          sql`count(distinct ${contactGroups.contactId}) desc`,
+          groups.name,
+        )
     : await db
         .select({
           id: groups.id,
@@ -128,7 +147,10 @@ export default async function Home({
         .groupBy(groups.id)
         .orderBy(sql`count(${contactGroups.contactId}) desc`, groups.name);
 
-  const candidateGroups = candidateRows.map((r) => ({ id: r.id, name: r.name }));
+  const candidateGroups = candidateRows.map((r) => ({
+    id: r.id,
+    name: r.name,
+  }));
   // Selected groups keep their chosen order so they stay put as active chips.
   const groupNameById = new Map(allGroups.map((g) => [g.id, g.name]));
   const selectedGroups = selectedGroupIds.map((id) => ({
@@ -295,7 +317,9 @@ export default async function Home({
             size="sm"
             asChild
             disabled={safePage >= totalPages}
-            className={safePage >= totalPages ? "pointer-events-none opacity-50" : ""}
+            className={
+              safePage >= totalPages ? "pointer-events-none opacity-50" : ""
+            }
           >
             <Link href={buildHref(safePage + 1)}>
               Вперёд <ChevronRight />
