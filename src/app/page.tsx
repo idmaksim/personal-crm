@@ -1,11 +1,22 @@
 import Link from "next/link";
-import { desc, or, sql, type Column, type SQL } from "drizzle-orm";
+import {
+  and,
+  desc,
+  eq,
+  inArray,
+  notInArray,
+  or,
+  sql,
+  type Column,
+  type SQL,
+} from "drizzle-orm";
 import { ChevronLeft, ChevronRight, Mail, Phone } from "lucide-react";
 import { db } from "@/db";
-import { contacts } from "@/db/schema";
+import { contacts, groups, contactGroups } from "@/db/schema";
 import { SearchBox } from "@/components/search-box";
 import { AddContactForm } from "@/components/add-contact-form";
 import { DeleteContactButton } from "@/components/delete-contact-button";
+import { GroupFilter } from "@/components/group-filter";
 import { Avatar } from "@/components/avatar";
 import { OverdueContacts } from "@/components/overdue-contacts";
 import { getOverdueContacts } from "@/lib/keep-in-touch";
@@ -34,23 +45,118 @@ function buildPattern(query: string): string {
   return `%${escaped}%`;
 }
 
+// Read the repeatable ?group param (string | string[] | undefined) into a list
+// of integer ids, dropping anything that is not a valid integer.
+function parseGroupIds(raw: string | string[] | undefined): number[] {
+  const values = raw === undefined ? [] : Array.isArray(raw) ? raw : [raw];
+  const ids: number[] = [];
+  for (const value of values) {
+    const id = Number(value);
+    if (Number.isInteger(id)) ids.push(id);
+  }
+  return ids;
+}
+
 export default async function Home({
   searchParams,
 }: {
-  searchParams: Promise<{ q?: string; page?: string }>;
+  searchParams: Promise<{
+    q?: string;
+    page?: string;
+    group?: string | string[];
+  }>;
 }) {
-  const { q, page } = await searchParams;
+  const { q, page, group } = await searchParams;
   const query = q?.trim() ?? "";
   const currentPage = Math.max(1, Number(page) || 1);
 
+  // All groups, for the filter and its suggestions.
+  const allGroups = await db
+    .select({ id: groups.id, name: groups.name })
+    .from(groups)
+    .orderBy(groups.name);
+
+  // Keep only requested group ids that still exist (deleted/unknown ones are
+  // silently dropped, so the list does not break when a group disappears).
+  const existingGroupIds = new Set(allGroups.map((g) => g.id));
+  const requestedGroupIds = parseGroupIds(group);
+  const selectedGroupIds = requestedGroupIds.filter((id) =>
+    existingGroupIds.has(id),
+  );
+
   const pattern = buildPattern(query);
-  const where = query
+  const searchWhere = query
     ? or(
         fuzzyMatch(contacts.name, pattern),
         fuzzyMatch(contacts.phone, pattern),
         fuzzyMatch(contacts.email, pattern),
       )
     : undefined;
+
+  // Contact ids in the intersection of the selected groups (belong to every one).
+  const matchingContactIds =
+    selectedGroupIds.length > 0
+      ? db
+          .select({ id: contactGroups.contactId })
+          .from(contactGroups)
+          .where(inArray(contactGroups.groupId, selectedGroupIds))
+          .groupBy(contactGroups.contactId)
+          .having(
+            sql`count(distinct ${contactGroups.groupId}) = ${selectedGroupIds.length}`,
+          )
+      : undefined;
+
+  const groupWhere = matchingContactIds
+    ? inArray(contacts.id, matchingContactIds)
+    : undefined;
+
+  const where = and(searchWhere, groupWhere);
+
+  // Groups offered in the filter, ordered from most-used to least-used. Empty
+  // groups are left out. Once something is selected, only groups that still
+  // share a contact with the whole selection are offered — so the owner cannot
+  // build a combination that would show nothing.
+  const candidateRows = matchingContactIds
+    ? await db
+        .select({
+          id: groups.id,
+          name: groups.name,
+          cnt: sql<number>`count(distinct ${contactGroups.contactId})::int`,
+        })
+        .from(contactGroups)
+        .innerJoin(groups, eq(contactGroups.groupId, groups.id))
+        .where(
+          and(
+            inArray(contactGroups.contactId, matchingContactIds),
+            notInArray(groups.id, selectedGroupIds),
+          ),
+        )
+        .groupBy(groups.id)
+        .orderBy(
+          sql`count(distinct ${contactGroups.contactId}) desc`,
+          groups.name,
+        )
+    : await db
+        .select({
+          id: groups.id,
+          name: groups.name,
+          cnt: sql<number>`count(${contactGroups.contactId})::int`,
+        })
+        .from(groups)
+        .innerJoin(contactGroups, eq(contactGroups.groupId, groups.id))
+        .groupBy(groups.id)
+        .orderBy(sql`count(${contactGroups.contactId}) desc`, groups.name);
+
+  const candidateGroups = candidateRows.map((r) => ({
+    id: r.id,
+    name: r.name,
+  }));
+  // Selected groups keep their chosen order so they stay put as active chips.
+  const groupNameById = new Map(allGroups.map((g) => [g.id, g.name]));
+  const selectedGroups = selectedGroupIds.map((id) => ({
+    id,
+    name: groupNameById.get(id) ?? "",
+  }));
 
   const [{ total }] = await db
     .select({ total: sql<number>`count(*)::int` })
@@ -68,11 +174,34 @@ export default async function Home({
     .limit(PAGE_SIZE)
     .offset((safePage - 1) * PAGE_SIZE);
 
+  // Group labels for the contacts shown on this page.
+  const rowIds = rows.map((c) => c.id);
+  const labelRows = rowIds.length
+    ? await db
+        .select({
+          contactId: contactGroups.contactId,
+          id: groups.id,
+          name: groups.name,
+        })
+        .from(contactGroups)
+        .innerJoin(groups, eq(contactGroups.groupId, groups.id))
+        .where(inArray(contactGroups.contactId, rowIds))
+        .orderBy(groups.name)
+    : [];
+
+  const groupsByContact = new Map<number, { id: number; name: string }[]>();
+  for (const row of labelRows) {
+    const list = groupsByContact.get(row.contactId) ?? [];
+    list.push({ id: row.id, name: row.name });
+    groupsByContact.set(row.contactId, list);
+  }
+
   const overdue = await getOverdueContacts();
 
   const buildHref = (targetPage: number) => {
     const params = new URLSearchParams();
     if (query) params.set("q", query);
+    for (const id of selectedGroupIds) params.append("group", String(id));
     if (targetPage > 1) params.set("page", String(targetPage));
     const qs = params.toString();
     return qs ? `/?${qs}` : "/";
@@ -82,18 +211,18 @@ export default async function Home({
     <div className="space-y-6">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-semibold">Контакты</h1>
-        <AddContactForm />
+        <AddContactForm allGroups={allGroups.map((g) => g.name)} />
       </div>
 
       <OverdueContacts contacts={overdue} />
 
       <SearchBox />
 
+      <GroupFilter selected={selectedGroups} candidates={candidateGroups} />
+
       <p className="text-sm text-muted-foreground">
-        {query ? (
-          <>
-            Найдено: {total} по запросу «{query}»
-          </>
+        {query || selectedGroupIds.length > 0 ? (
+          <>Найдено: {total}</>
         ) : (
           <>Всего контактов: {total}</>
         )}
@@ -101,8 +230,8 @@ export default async function Home({
 
       {rows.length === 0 ? (
         <Card className="p-8 text-center text-muted-foreground">
-          {query
-            ? "Ничего не нашлось. Попробуйте другое имя."
+          {query || selectedGroupIds.length > 0
+            ? "Ничего не нашлось. Попробуйте изменить запрос или фильтр."
             : "Пока нет контактов. Добавьте первый."}
         </Card>
       ) : (
@@ -124,6 +253,18 @@ export default async function Home({
                         <p className="truncate text-sm text-muted-foreground">
                           {c.relationship}
                         </p>
+                      ) : null}
+                      {(groupsByContact.get(c.id) ?? []).length > 0 ? (
+                        <ul className="relative z-10 mt-1 flex flex-wrap gap-1">
+                          {(groupsByContact.get(c.id) ?? []).map((g) => (
+                            <li
+                              key={g.id}
+                              className="rounded-full bg-band px-2 py-0.5 text-xs text-muted-foreground"
+                            >
+                              {g.name}
+                            </li>
+                          ))}
+                        </ul>
                       ) : null}
                     </div>
                   </div>

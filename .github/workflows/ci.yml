@@ -71,3 +71,49 @@ jobs:
           tags: personal-crm:ci-${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  # End-to-end tests (Playwright) against the real app and a real Postgres — no
+  # mocks. Playwright builds and starts the app itself (see playwright.config.ts).
+  e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:18
+        env:
+          POSTGRES_USER: crm
+          POSTGRES_PASSWORD: crm
+          POSTGRES_DB: crm
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U crm -d crm"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://crm:crm@localhost:5432/crm
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browser
+        run: pnpm exec playwright install --with-deps chromium
+
+      - name: Apply migrations
+        run: pnpm db:migrate
+
+      - name: Run e2e tests
+        run: pnpm test:e2e

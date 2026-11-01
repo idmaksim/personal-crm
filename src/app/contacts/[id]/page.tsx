@@ -3,9 +3,10 @@ import { notFound } from "next/navigation";
 import { desc, eq } from "drizzle-orm";
 import { ArrowLeft, Mail, Phone } from "lucide-react";
 import { db } from "@/db";
-import { contacts, notes } from "@/db/schema";
+import { contacts, notes, groups, contactGroups } from "@/db/schema";
 import { NoteForm } from "@/components/note-form";
 import { ContactFrequencyForm } from "@/components/contact-frequency-form";
+import { ContactGroupsEditor } from "@/components/contact-groups-editor";
 import { getLastContactAt } from "@/lib/keep-in-touch";
 import {
   formatShortDate,
@@ -52,6 +53,18 @@ export default async function ContactPage({
     .from(notes)
     .where(eq(notes.contactId, contactId))
     .orderBy(desc(notes.createdAt));
+
+  const assignedGroups = await db
+    .select({ id: groups.id, name: groups.name })
+    .from(contactGroups)
+    .innerJoin(groups, eq(contactGroups.groupId, groups.id))
+    .where(eq(contactGroups.contactId, contactId))
+    .orderBy(groups.name);
+
+  const allGroups = await db
+    .select({ id: groups.id, name: groups.name })
+    .from(groups)
+    .orderBy(groups.name);
 
   const timing = getContactTiming(
     await getLastContactAt(contactId),
@@ -144,6 +157,19 @@ export default async function ContactPage({
               )
             ) : null}
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg">Группы</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <ContactGroupsEditor
+            contactId={contact.id}
+            assigned={assignedGroups}
+            allGroups={allGroups}
+          />
         </CardContent>
       </Card>
 
