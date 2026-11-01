@@ -11,6 +11,10 @@ node_modules/
 out/
 build/
 
+# Test artifacts
+/test-results/
+/playwright-report/
+
 # Logs
 *.log
 

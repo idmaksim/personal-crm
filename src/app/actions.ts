@@ -5,7 +5,11 @@ import { redirect } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import { contacts, notes } from "@/db/schema";
-import { formatShortDate, isContactFrequency, nextContactDate } from "@/lib/frequency";
+import {
+  formatShortDate,
+  isContactFrequency,
+  nextContactDate,
+} from "@/lib/frequency";
 
 // `message` is a confirmation to show after a successful save.
 export type ActionState = { error?: string; message?: string } | undefined;

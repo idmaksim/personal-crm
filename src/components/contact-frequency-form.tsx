@@ -31,7 +31,9 @@ export function ContactFrequencyForm({
         // Save right on change, there is no "Save" button
         onChange={() => formRef.current?.requestSubmit()}
       />
-      {state?.error ? <p className="text-sm text-destructive">{state.error}</p> : null}
+      {state?.error ? (
+        <p className="text-sm text-destructive">{state.error}</p>
+      ) : null}
     </form>
   );
 }

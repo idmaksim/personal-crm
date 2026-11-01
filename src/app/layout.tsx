@@ -34,7 +34,9 @@ export default function RootLayout({
               <span className="flex size-6 items-center justify-center rounded-[7px] bg-primary">
                 <span className="size-[9px] rounded-full border-2 border-primary-foreground" />
               </span>
-              <span className="text-[18px] font-semibold text-foreground">Круг</span>
+              <span className="text-[18px] font-semibold text-foreground">
+                Круг
+              </span>
             </Link>
           </div>
         </header>
