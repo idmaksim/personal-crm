@@ -7,7 +7,11 @@ import { contacts, notes } from "@/db/schema";
 import { NoteForm } from "@/components/note-form";
 import { ContactFrequencyForm } from "@/components/contact-frequency-form";
 import { getLastContactAt } from "@/lib/keep-in-touch";
-import { formatShortDate, getContactTiming, pluralizeDays } from "@/lib/frequency";
+import {
+  formatShortDate,
+  getContactTiming,
+  pluralizeDays,
+} from "@/lib/frequency";
 import { DeleteContactButton } from "@/components/delete-contact-button";
 import { Avatar } from "@/components/avatar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -49,7 +53,10 @@ export default async function ContactPage({
     .where(eq(notes.contactId, contactId))
     .orderBy(desc(notes.createdAt));
 
-  const timing = getContactTiming(await getLastContactAt(contactId), contact.frequency);
+  const timing = getContactTiming(
+    await getLastContactAt(contactId),
+    contact.frequency,
+  );
 
   return (
     <div className="space-y-6">
@@ -64,7 +71,10 @@ export default async function ContactPage({
         <CardHeader>
           <div className="flex items-start justify-between gap-4">
             <div className="flex min-w-0 flex-1 items-center gap-4">
-              <Avatar name={contact.name} className="size-12 shrink-0 text-base" />
+              <Avatar
+                name={contact.name}
+                className="size-12 shrink-0 text-base"
+              />
               <div className="min-w-0">
                 <CardTitle className="break-words text-2xl">
                   {contact.name}
@@ -110,7 +120,10 @@ export default async function ContactPage({
 
       <Card>
         <CardContent className="space-y-4 pt-6">
-          <ContactFrequencyForm contactId={contact.id} frequency={contact.frequency} />
+          <ContactFrequencyForm
+            contactId={contact.id}
+            frequency={contact.frequency}
+          />
           <div className="space-y-1 text-sm">
             <p>
               <span className="text-muted-foreground">Последнее общение: </span>
@@ -123,7 +136,9 @@ export default async function ContactPage({
                 </p>
               ) : (
                 <p>
-                  <span className="text-muted-foreground">Связаться снова: </span>
+                  <span className="text-muted-foreground">
+                    Связаться снова:{" "}
+                  </span>
                   после {formatShortDate(timing.nextAt)}
                 </p>
               )

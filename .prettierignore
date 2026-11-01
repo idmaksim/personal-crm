@@ -1,0 +1,13 @@
+# Not ours / generated — Prettier should not touch these.
+pnpm-lock.yaml
+node_modules
+.next
+drizzle
+test-results
+*.tsbuildinfo
+next-env.d.ts
+
+# CLI tooling and generated change overviews — managed by their own tools, not
+# hand-formatted here.
+.claude
+openspec

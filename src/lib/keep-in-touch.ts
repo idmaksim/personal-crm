@@ -15,9 +15,10 @@ end`;
 export async function getLastContactAt(contactId: number): Promise<Date> {
   const [row] = await db
     .select({
-      lastContactAt: sql<Date>`coalesce(max(${notes.createdAt}), ${contacts.createdAt})`.mapWith(
-        (v) => new Date(v),
-      ),
+      lastContactAt:
+        sql<Date>`coalesce(max(${notes.createdAt}), ${contacts.createdAt})`.mapWith(
+          (v) => new Date(v),
+        ),
     })
     .from(contacts)
     .leftJoin(notes, eq(notes.contactId, contacts.id))

@@ -91,7 +91,9 @@ export default async function Home({
 
       <p className="text-sm text-muted-foreground">
         {query ? (
-          <>Найдено: {total} по запросу «{query}»</>
+          <>
+            Найдено: {total} по запросу «{query}»
+          </>
         ) : (
           <>Всего контактов: {total}</>
         )}
@@ -174,7 +176,9 @@ export default async function Home({
             size="sm"
             asChild
             disabled={safePage >= totalPages}
-            className={safePage >= totalPages ? "pointer-events-none opacity-50" : ""}
+            className={
+              safePage >= totalPages ? "pointer-events-none opacity-50" : ""
+            }
           >
             <Link href={buildHref(safePage + 1)}>
               Вперёд <ChevronRight />

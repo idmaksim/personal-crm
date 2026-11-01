@@ -19,7 +19,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { FREQUENCY_LABELS, formatShortDate, pluralizeDays } from "@/lib/frequency";
+import {
+  FREQUENCY_LABELS,
+  formatShortDate,
+  pluralizeDays,
+} from "@/lib/frequency";
 
 export type OverdueItem = {
   id: number;
@@ -91,7 +95,11 @@ function MarkContactedButton({
             <AlertDialogCancel disabled={pending} className="w-full sm:w-auto">
               Отмена
             </AlertDialogCancel>
-            <Button type="submit" disabled={pending} className="w-full sm:w-auto">
+            <Button
+              type="submit"
+              disabled={pending}
+              className="w-full sm:w-auto"
+            >
               {pending ? "Сохраняю…" : "Сохранить"}
             </Button>
           </AlertDialogFooter>
@@ -159,14 +167,21 @@ export function OverdueContacts({ contacts }: { contacts: OverdueItem[] }) {
                         </p>
                       </div>
                     </div>
-                    <MarkContactedButton contact={c} onSaved={setConfirmation} />
+                    <MarkContactedButton
+                      contact={c}
+                      onSaved={setConfirmation}
+                    />
                   </div>
                 </Card>
               </li>
             ))}
           </ul>
           {hiddenCount > 0 ? (
-            <Button variant="outline" size="sm" onClick={() => setShowAll(true)}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setShowAll(true)}
+            >
               Показать ещё {hiddenCount}
             </Button>
           ) : null}
