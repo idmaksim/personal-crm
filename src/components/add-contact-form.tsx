@@ -6,10 +6,11 @@ import { createContact, type ActionState } from "@/app/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FrequencySelect } from "@/components/frequency-select";
+import { GroupSelectField } from "@/components/group-select-field";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 
-export function AddContactForm() {
+export function AddContactForm({ allGroups }: { allGroups: string[] }) {
   const [open, setOpen] = useState(false);
   const [state, formAction, pending] = useActionState<ActionState, FormData>(
     createContact,
@@ -54,6 +55,8 @@ export function AddContactForm() {
             <Label htmlFor="frequency">Как часто общаться</Label>
             <FrequencySelect id="frequency" name="frequency" defaultValue="" />
           </div>
+
+          <GroupSelectField allGroups={allGroups} />
 
           {state?.error ? (
             <p className="text-sm text-destructive">{state.error}</p>
