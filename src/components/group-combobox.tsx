@@ -2,6 +2,10 @@
 
 import { useId, useRef, useState } from "react";
 import { Plus } from "lucide-react";
+import {
+  dropdownItemClassName,
+  dropdownPanelClassName,
+} from "@/components/ui/dropdown-panel";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 
@@ -112,7 +116,10 @@ export function GroupCombobox({
         <ul
           id={listId}
           role="listbox"
-          className="absolute z-20 mt-1 max-h-60 w-full overflow-auto rounded-[12px] border border-input bg-card p-1 shadow-lg"
+          className={cn(
+            dropdownPanelClassName,
+            "absolute z-50 mt-1 max-h-60 w-full overflow-auto",
+          )}
           // Keep focus on the input so onBlur/click ordering stays predictable.
           onMouseDown={(e) => e.preventDefault()}
         >
@@ -126,7 +133,8 @@ export function GroupCombobox({
                   pick(name);
                 }}
                 className={cn(
-                  "w-full rounded-[8px] px-3 py-2 text-left text-sm",
+                  dropdownItemClassName,
+                  "w-full text-left",
                   active === index ? "bg-band" : "hover:bg-band",
                 )}
               >
@@ -145,7 +153,8 @@ export function GroupCombobox({
                   pick(value);
                 }}
                 className={cn(
-                  "flex w-full items-center gap-2 rounded-[8px] px-3 py-2 text-left text-sm",
+                  dropdownItemClassName,
+                  "flex w-full items-center gap-2 text-left",
                   active === suggestions.length ? "bg-band" : "hover:bg-band",
                 )}
               >
@@ -160,7 +169,12 @@ export function GroupCombobox({
       ) : null}
 
       {open && alreadyChosen ? (
-        <div className="absolute z-20 mt-1 w-full rounded-[12px] border border-input bg-card p-3 text-sm text-muted-foreground shadow-lg">
+        <div
+          className={cn(
+            dropdownPanelClassName,
+            "absolute z-50 mt-1 w-full p-3 text-sm text-muted-foreground",
+          )}
+        >
           «{value.trim()}» уже добавлена
         </div>
       ) : null}

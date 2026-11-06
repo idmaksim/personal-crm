@@ -3,6 +3,10 @@
 import * as React from "react";
 import * as SelectPrimitive from "@radix-ui/react-select";
 import { Check, ChevronDown, ChevronUp } from "lucide-react";
+import {
+  dropdownItemClassName,
+  dropdownPanelClassName,
+} from "@/components/ui/dropdown-panel";
 import { cn } from "@/lib/utils";
 
 const Select = SelectPrimitive.Root;
@@ -72,7 +76,8 @@ const SelectContent = React.forwardRef<
     <SelectPrimitive.Content
       ref={ref}
       className={cn(
-        "relative z-50 max-h-[var(--radix-select-content-available-height)] min-w-[8rem] overflow-hidden rounded-[12px] border border-border bg-card text-foreground shadow-lg",
+        dropdownPanelClassName,
+        "relative z-50 max-h-[var(--radix-select-content-available-height)] min-w-[8rem] overflow-hidden text-foreground",
         position === "popper" &&
           "w-[var(--radix-select-trigger-width)] data-[side=bottom]:translate-y-1 data-[side=top]:-translate-y-1",
         className,
@@ -82,9 +87,7 @@ const SelectContent = React.forwardRef<
       {...props}
     >
       <SelectScrollUpButton />
-      <SelectPrimitive.Viewport className="p-1">
-        {children}
-      </SelectPrimitive.Viewport>
+      <SelectPrimitive.Viewport>{children}</SelectPrimitive.Viewport>
       <SelectScrollDownButton />
     </SelectPrimitive.Content>
   </SelectPrimitive.Portal>
@@ -98,7 +101,8 @@ const SelectItem = React.forwardRef<
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex w-full cursor-default select-none items-center rounded-[8px] py-2 pl-3 pr-9 text-sm outline-none focus:bg-secondary focus:text-secondary-foreground data-[highlighted]:bg-secondary data-[highlighted]:text-secondary-foreground data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
+      dropdownItemClassName,
+      "relative flex w-full select-none items-center pr-9 focus:bg-band data-[highlighted]:bg-band data-[disabled]:pointer-events-none data-[disabled]:opacity-50",
       className,
     )}
     {...props}
