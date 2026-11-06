@@ -9,6 +9,7 @@ const config = [
   {
     ignores: [
       ".next/**",
+      ".next-e2e/**",
       "node_modules/**",
       "drizzle/**",
       "test-results/**",

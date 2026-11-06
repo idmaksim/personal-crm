@@ -33,7 +33,9 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: `pnpm next build && pnpm next start --port ${PORT}`,
+    // Build and serve into a dedicated dist dir so the e2e run never overwrites
+    // the ".next" a local `pnpm dev` on :3000 is using (see next.config.mjs).
+    command: `NEXT_DIST_DIR=.next-e2e pnpm next build && NEXT_DIST_DIR=.next-e2e pnpm next start --port ${PORT}`,
     url: baseURL,
     // Always use the server Playwright builds and starts, so the run reflects the
     // current source (and so a stale server from a previous run is never reused).
