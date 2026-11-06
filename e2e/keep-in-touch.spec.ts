@@ -178,17 +178,18 @@ test("card: choosing a frequency saves immediately, with no Save button", async 
   const id = await seedContact({ name, frequency: null, daysAgo: 1 });
 
   await page.goto(`/contacts/${id}`);
-  const select = page.locator("#frequency");
-  await expect(select).toHaveValue("");
+  const trigger = page.locator("#frequency");
+  await expect(trigger).toContainText("Не задано");
 
-  await select.selectOption({ label: "Раз в месяц" });
+  await trigger.click();
+  await page.getByRole("option", { name: "Раз в месяц" }).click();
   // No Save button: once the auto-submit lands, the card re-renders with the
   // next-contact line, which only appears when a frequency is set.
   await expect(page.getByText("Связаться снова")).toBeVisible();
 
   // The choice survives a reload (it is persisted, not just selected in the DOM).
   await page.reload();
-  await expect(page.locator("#frequency")).toHaveValue("monthly");
+  await expect(page.locator("#frequency")).toContainText("Раз в месяц");
 });
 
 test("card: an overdue contact shows the due note with the day count", async ({
