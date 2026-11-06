@@ -6,6 +6,7 @@
   "packageManager": "pnpm@12.11.2",
   "scripts": {
     "dev": "next dev",
+    "dev:clean": "rm -rf .next && next dev",
     "build": "next build",
     "start": "next start",
     "db:generate": "drizzle-kit generate",
