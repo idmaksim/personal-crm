@@ -164,13 +164,12 @@ export async function addNote(
   return { message };
 }
 
+// Called directly (not via a form action) so the save does not trigger React's
+// post-submit form reset, which would make the Radix Select revert the choice.
 export async function setContactFrequency(
-  _prevState: ActionState,
-  formData: FormData,
+  contactId: number,
+  value: string,
 ): Promise<ActionState> {
-  const contactId = Number(formData.get("contactId"));
-  const value = String(formData.get("frequency") ?? "");
-
   if (!Number.isInteger(contactId)) {
     return { error: "Контакт не найден" };
   }
