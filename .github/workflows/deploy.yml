@@ -62,10 +62,15 @@ jobs:
           chmod 600 ~/.ssh/id_deploy
           ssh-keyscan -H "$SERVER_HOST" >> ~/.ssh/known_hosts 2>/dev/null
 
-          # Copy deploy scripts to the server. This does NOT touch ~/deploy/.env
-          # (it is not in the source and scp does not delete existing files).
-          scp -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes \
-            deploy/docker-compose.prod.yml deploy/deploy.sh \
+          # Copy the whole deploy/ folder to the server, so new scripts (e.g.
+          # restore.sh) travel automatically — no workflow change needed per
+          # script. scp only adds/overwrites files; it does NOT delete anything
+          # already on the server, so ~/deploy/.env and ~/deploy/backups/ (both
+          # server-only, not in the repo) are left untouched.
+          ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes \
+            "$SERVER_USER@$SERVER_HOST" "mkdir -p ~/deploy"
+          scp -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes -r \
+            deploy/. \
             "$SERVER_USER@$SERVER_HOST:~/deploy/"
 
           # Log in to GHCR on the server (to pull the private image), then deploy.

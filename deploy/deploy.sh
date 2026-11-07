@@ -5,9 +5,12 @@
 #
 #   bash ~/deploy/deploy.sh ghcr.io/<owner>/<repo>:<sha>
 #
-# Steps: pull image -> start DB -> run migrations (one-shot) -> start app ->
-# smoke test /health -> clean up old images. If migrations or the smoke test
-# fail, the script exits non-zero and does NOT roll back (rollback is manual).
+# Steps: pull image -> start DB -> back up the database -> run migrations
+# (one-shot) -> start app -> smoke test /health -> clean up old images and
+# backups. The backup is named after the app version that was running BEFORE
+# this deploy, so you can see which release each backup belongs to. If the
+# backup, migrations or the smoke test fail, the script exits non-zero and does
+# NOT roll back (rollback is manual).
 set -euo pipefail
 
 IMAGE="${1:?usage: deploy.sh <image-ref>}"
@@ -19,6 +22,10 @@ if [ ! -f .env ]; then
   echo "ERROR: $DEPLOY_DIR/.env not found. Create it first." >&2
   exit 1
 fi
+
+BACKUP_DIR="$DEPLOY_DIR/backups"
+BACKUPS_TO_KEEP=10
+DB_CONTAINER="prod-postgres"
 
 export APP_IMAGE="$IMAGE"
 COMPOSE=(docker compose -p prod -f docker-compose.prod.yml)
@@ -33,6 +40,42 @@ echo "==> Pulling image: $IMAGE"
 
 echo "==> Starting database"
 "${COMPOSE[@]}" up -d postgres
+
+# Wait until Postgres is actually accepting connections before we dump it. The
+# compose healthcheck already does this for the app, but the backup below talks
+# to the container directly, so we wait here too.
+echo "==> Waiting for the database to be ready"
+db_ready=""
+for i in $(seq 1 30); do
+  if docker exec "$DB_CONTAINER" sh -c 'pg_isready -U "$POSTGRES_USER" -d "$POSTGRES_DB"' >/dev/null 2>&1; then
+    db_ready=1; break
+  fi
+  sleep 2
+done
+if [ "$db_ready" != "1" ]; then
+  echo "ERROR: database did not become ready in time; aborting before backup." >&2
+  exit 1
+fi
+
+# Back up the database BEFORE migrations touch it. The backup file is named
+# after the app version that is running right now (before this deploy), so each
+# backup is tied to the release it was taken from. On the very first deploy
+# there is no running app yet, so we record the version as "none".
+echo "==> Backing up the database (before migrations)"
+PREV_VERSION="$(docker inspect --format '{{.Config.Image}}' prod-app 2>/dev/null | sed 's#.*:##' || true)"
+if [ -z "$PREV_VERSION" ]; then PREV_VERSION="none"; fi
+mkdir -p "$BACKUP_DIR"
+BACKUP_FILE="$BACKUP_DIR/backup_$(date +%Y%m%d-%H%M%S)_${PREV_VERSION}.dump"
+# Dump from inside the container, reading DB credentials from the container's
+# own environment, so this script never has to read secrets from .env.
+# -Fc = custom format: compressed and restored cleanly by pg_restore.
+if ! docker exec "$DB_CONTAINER" sh -c \
+    'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$BACKUP_FILE"; then
+  echo "BACKUP FAILED — aborting deploy before migrations run." >&2
+  rm -f "$BACKUP_FILE"
+  exit 1
+fi
+echo "    Saved backup: $BACKUP_FILE"
 
 echo "==> Applying migrations (one-shot; deploy aborts if this fails)"
 "${COMPOSE[@]}" run --rm migrate
@@ -93,5 +136,12 @@ docker images "$REPO" --format '{{.CreatedAt}}|{{.ID}}' \
   | sort -u \
   | xargs -r docker rmi -f 2>/dev/null || true
 docker image prune -f >/dev/null 2>&1 || true
+
+echo "==> Cleaning up old backups (keep the $BACKUPS_TO_KEEP newest)"
+# List backups newest-first by name (the timestamp prefix sorts chronologically)
+# and delete everything past the first $BACKUPS_TO_KEEP.
+ls -1t "$BACKUP_DIR"/backup_*.dump 2>/dev/null \
+  | tail -n "+$((BACKUPS_TO_KEEP + 1))" \
+  | xargs -r rm -f
 
 echo "==> Deploy complete: $IMAGE"
