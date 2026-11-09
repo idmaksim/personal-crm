@@ -17,6 +17,16 @@ services:
       timeout: 5s
       retries: 10
 
+  # SMTP stub that catches every outgoing email instead of sending it, with a
+  # web UI to read them at http://localhost:8025.
+  mailpit:
+    image: axllent/mailpit:v1.28.2
+    container_name: personal-crm-mailpit
+    restart: unless-stopped
+    ports:
+      - "1025:1025"
+      - "8025:8025"
+
   # Web UI to browse the database at http://localhost:8080
   adminer:
     image: adminer:5

@@ -1,9 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import { ArrowLeft, Mail, Phone } from "lucide-react";
 import { db } from "@/db";
 import { contacts, notes, groups, contactGroups } from "@/db/schema";
+import { requireUser } from "@/lib/session";
 import { NoteForm } from "@/components/note-form";
 import { ContactFrequencyForm } from "@/components/contact-frequency-form";
 import { ContactGroupsEditor } from "@/components/contact-groups-editor";
@@ -36,6 +37,7 @@ export default async function ContactPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const user = await requireUser();
   const { id } = await params;
   const contactId = Number(id);
   if (!Number.isInteger(contactId)) notFound();
@@ -43,7 +45,7 @@ export default async function ContactPage({
   const [contact] = await db
     .select()
     .from(contacts)
-    .where(eq(contacts.id, contactId))
+    .where(and(eq(contacts.id, contactId), eq(contacts.ownerId, user.id)))
     .limit(1);
 
   if (!contact) notFound();
@@ -64,10 +66,11 @@ export default async function ContactPage({
   const allGroups = await db
     .select({ id: groups.id, name: groups.name })
     .from(groups)
+    .where(eq(groups.ownerId, user.id))
     .orderBy(groups.name);
 
   const timing = getContactTiming(
-    await getLastContactAt(contactId),
+    await getLastContactAt(contactId, user.id),
     contact.frequency,
   );
 

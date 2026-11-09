@@ -1,13 +1,18 @@
 import "dotenv/config";
+import { eq } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import { fakerRU as faker } from "@faker-js/faker";
-import { contacts, notes } from "./schema";
+import { contacts, notes, user } from "./schema";
 
 const connectionString = process.env.DATABASE_URL;
+const ownerEmail: string = process.env.OWNER_EMAIL ?? "";
 
 if (!connectionString) {
   throw new Error("DATABASE_URL is not set. Check your .env file.");
+}
+if (!ownerEmail) {
+  throw new Error("OWNER_EMAIL is not set. Check your .env file.");
 }
 
 const CONTACTS_COUNT = 1000;
@@ -57,6 +62,17 @@ async function main() {
   const client = postgres(connectionString!, { max: 1 });
   const db = drizzle(client);
 
+  const [owner] = await db
+    .select({ id: user.id })
+    .from(user)
+    .where(eq(user.email, ownerEmail))
+    .limit(1);
+  if (!owner) {
+    throw new Error(
+      `No user with email ${ownerEmail} found. Run "pnpm db:migrate" first — it creates the OWNER_EMAIL user.`,
+    );
+  }
+
   console.log("Clearing existing data...");
   await db.delete(notes);
   await db.delete(contacts);
@@ -69,6 +85,7 @@ async function main() {
     const hasEmail = Math.random() > 0.15;
     const hasPhone = Math.random() > 0.1;
     return {
+      ownerId: owner.id,
       name: `${firstName} ${lastName}`,
       relationship: Math.random() > 0.1 ? pick(relationships) : null,
       phone: hasPhone ? faker.phone.number() : null,

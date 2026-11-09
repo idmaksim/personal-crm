@@ -91,8 +91,23 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      # SMTP stub the e2e login helper reads sent mail from via its HTTP API.
+      mailpit:
+        image: axllent/mailpit:v1.28.2
+        ports:
+          - 1025:1025
+          - 8025:8025
     env:
       DATABASE_URL: postgresql://crm:crm@localhost:5432/crm
+      OWNER_EMAIL: owner@example.com
+      BETTER_AUTH_SECRET: ci-test-secret-not-used-in-production
+      BETTER_AUTH_URL: http://localhost:3100
+      SMTP_HOST: localhost
+      SMTP_PORT: 1025
+      SMTP_SECURE: "false"
+      SMTP_USER: ""
+      SMTP_PASS: ""
+      MAIL_FROM: noreply@mail.crm.localhost
     steps:
       - name: Checkout
         uses: actions/checkout@v7

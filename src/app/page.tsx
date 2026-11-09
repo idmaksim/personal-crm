@@ -13,6 +13,7 @@ import {
 import { ChevronLeft, ChevronRight, Mail, Phone } from "lucide-react";
 import { db } from "@/db";
 import { contacts, groups, contactGroups } from "@/db/schema";
+import { requireUser } from "@/lib/session";
 import { SearchBox } from "@/components/search-box";
 import { AddContactForm } from "@/components/add-contact-form";
 import { DeleteContactButton } from "@/components/delete-contact-button";
@@ -66,14 +67,16 @@ export default async function Home({
     group?: string | string[];
   }>;
 }) {
+  const user = await requireUser();
   const { q, page, group } = await searchParams;
   const query = q?.trim() ?? "";
   const currentPage = Math.max(1, Number(page) || 1);
 
-  // All groups, for the filter and its suggestions.
+  // All of this owner's groups, for the filter and its suggestions.
   const allGroups = await db
     .select({ id: groups.id, name: groups.name })
     .from(groups)
+    .where(eq(groups.ownerId, user.id))
     .orderBy(groups.name);
 
   // Keep only requested group ids that still exist (deleted/unknown ones are
@@ -110,7 +113,7 @@ export default async function Home({
     ? inArray(contacts.id, matchingContactIds)
     : undefined;
 
-  const where = and(searchWhere, groupWhere);
+  const where = and(eq(contacts.ownerId, user.id), searchWhere, groupWhere);
 
   // Groups offered in the filter, ordered from most-used to least-used. Empty
   // groups are left out. Once something is selected, only groups that still
@@ -127,6 +130,7 @@ export default async function Home({
         .innerJoin(groups, eq(contactGroups.groupId, groups.id))
         .where(
           and(
+            eq(groups.ownerId, user.id),
             inArray(contactGroups.contactId, matchingContactIds),
             notInArray(groups.id, selectedGroupIds),
           ),
@@ -144,6 +148,7 @@ export default async function Home({
         })
         .from(groups)
         .innerJoin(contactGroups, eq(contactGroups.groupId, groups.id))
+        .where(eq(groups.ownerId, user.id))
         .groupBy(groups.id)
         .orderBy(sql`count(${contactGroups.contactId}) desc`, groups.name);
 
@@ -196,7 +201,7 @@ export default async function Home({
     groupsByContact.set(row.contactId, list);
   }
 
-  const overdue = await getOverdueContacts();
+  const overdue = await getOverdueContacts(user.id);
 
   const buildHref = (targetPage: number) => {
     const params = new URLSearchParams();
@@ -232,7 +237,7 @@ export default async function Home({
         <Card className="p-8 text-center text-muted-foreground">
           {query || selectedGroupIds.length > 0
             ? "Ничего не нашлось. Попробуйте изменить запрос или фильтр."
-            : "Пока нет контактов. Добавьте первый."}
+            : "Добавь первый контакт"}
         </Card>
       ) : (
         <ul className="space-y-2">
