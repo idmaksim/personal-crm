@@ -3,6 +3,7 @@ import { eq, sql } from "drizzle-orm";
 import { ArrowLeft } from "lucide-react";
 import { db } from "@/db";
 import { groups, contactGroups } from "@/db/schema";
+import { requireUser } from "@/lib/session";
 import { CreateGroupForm } from "@/components/create-group-form";
 import { GroupRow } from "@/components/group-row";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,6 +13,7 @@ import { Card, CardContent } from "@/components/ui/card";
 export const dynamic = "force-dynamic";
 
 export default async function GroupsPage() {
+  const user = await requireUser();
   const rows = await db
     .select({
       id: groups.id,
@@ -20,6 +22,7 @@ export default async function GroupsPage() {
     })
     .from(groups)
     .leftJoin(contactGroups, eq(contactGroups.groupId, groups.id))
+    .where(eq(groups.ownerId, user.id))
     .groupBy(groups.id)
     .orderBy(groups.name);
 

@@ -1,5 +1,8 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { headers } from "next/headers";
+import { auth } from "@/lib/auth";
+import { LogoutButton } from "@/components/logout-button";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -7,9 +10,13 @@ export const metadata: Metadata = {
   description: "Контакты людей, которых я знаю лично",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  // Not requireUser(): the layout wraps /login too, where there is no
+  // session yet, and must render without redirecting.
+  const session = await auth.api.getSession({ headers: await headers() });
+
   return (
     <html lang="ru">
       <head>
@@ -28,7 +35,7 @@ export default function RootLayout({
       </head>
       <body className="min-h-screen">
         <header className="border-b border-hairline">
-          <div className="mx-auto flex max-w-3xl items-center gap-[10px] px-4 py-[18px]">
+          <div className="mx-auto flex max-w-3xl items-center justify-between gap-[10px] px-4 py-[18px]">
             <Link href="/" className="flex items-center gap-[10px]">
               {/* Logo: dark tile with a ring inside — matches the landing mark */}
               <span className="flex size-6 items-center justify-center rounded-[7px] bg-primary">
@@ -38,6 +45,14 @@ export default function RootLayout({
                 Круг
               </span>
             </Link>
+            {session ? (
+              <div className="flex items-center gap-3">
+                <span className="hidden text-sm text-muted-foreground sm:inline">
+                  {session.user.email}
+                </span>
+                <LogoutButton />
+              </div>
+            ) : null}
           </div>
         </header>
         <main className="mx-auto max-w-3xl px-4 py-8">{children}</main>

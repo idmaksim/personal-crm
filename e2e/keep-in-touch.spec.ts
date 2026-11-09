@@ -1,24 +1,51 @@
 import { test, expect, type Locator, type Page } from "@playwright/test";
 import postgres from "postgres";
+import { loginAs } from "./support/login";
 
 // Keep-in-touch scenarios driven through the real UI against the real Postgres
 // (no mocks). To get a contact whose due date has already passed without waiting
 // days, we seed it straight into the database with a back-dated created_at — the
-// same database the app reads. Every seeded contact is named with this prefix so
-// the teardown removes exactly those rows (notes go with them via ON DELETE
-// cascade) and leaves the owner's real contacts untouched.
+// same database the app reads. Every seeded contact is named with this prefix,
+// and each test logs in as its own owner (a shared owner across tests would hit
+// the "3 magic links per 10 minutes" rate limit), so the teardown removes every
+// owner matching this email prefix (cascades to their contacts/notes and
+// Better Auth session/account).
 const PREFIX = "E2E_TEST_";
+const OWNER_EMAIL_PREFIX = "e2e_test_keep_in_touch_";
 
-// A token unique to each test, so names never collide across runs or tests.
+// A token unique to each test, so names (and owner emails) never collide
+// across runs or tests.
 function uniq(): string {
   return `${Date.now()}_${Math.floor(Math.random() * 1e6)}`;
 }
 
+function uniqueOwnerEmail(): string {
+  return `${OWNER_EMAIL_PREFIX}${uniq()}@example.com`;
+}
+
 type Frequency = "weekly" | "monthly" | "quarterly" | "yearly";
+
+// Only valid after loginAs(page, ownerEmail) has run (that's what creates the
+// user).
+async function getOwnerId(ownerEmail: string): Promise<string> {
+  const url = process.env.DATABASE_URL;
+  if (!url) throw new Error("DATABASE_URL is not set");
+  const sql = postgres(url);
+  try {
+    const [row] = await sql<{ id: string }[]>`
+      select id from "user" where email = ${ownerEmail}
+    `;
+    if (!row) throw new Error(`Owner user ${ownerEmail} not found`);
+    return row.id;
+  } finally {
+    await sql.end();
+  }
+}
 
 // Insert a contact with a back-dated created_at. With no notes, created_at is
 // also the "last contact" date the app counts the due date from. Returns its id.
 async function seedContact(opts: {
+  ownerId: string;
   name: string;
   relationship?: string | null;
   frequency?: Frequency | null;
@@ -29,8 +56,9 @@ async function seedContact(opts: {
   const sql = postgres(url);
   try {
     const [row] = await sql<{ id: number }[]>`
-      insert into contacts (name, relationship, frequency, created_at)
+      insert into contacts (owner_id, name, relationship, frequency, created_at)
       values (
+        ${opts.ownerId},
         ${opts.name},
         ${opts.relationship ?? null},
         ${opts.frequency ?? null}::contact_frequency,
@@ -64,7 +92,8 @@ test.afterAll(async () => {
   if (!url) return;
   const sql = postgres(url);
   try {
-    await sql`delete from contacts where name like ${PREFIX + "%"}`;
+    // Cascades to each owner's contacts/notes and Better Auth session/account.
+    await sql`delete from "user" where email like ${OWNER_EMAIL_PREFIX + "%"}`;
   } finally {
     await sql.end();
   }
@@ -73,13 +102,22 @@ test.afterAll(async () => {
 test("home: the overdue block lists due contacts, longest-waiting first, above search", async ({
   page,
 }) => {
+  const ownerEmail = uniqueOwnerEmail();
+  await loginAs(page, ownerEmail);
+  const ownerId = await getOwnerId(ownerEmail);
   const run = uniq();
   const longer = `${PREFIX}${run} A Долгожданный`;
   const shorter = `${PREFIX}${run} B Недавний`;
   // A: monthly, last contact 70 days ago -> due ~40 days ago (waits longest).
-  await seedContact({ name: longer, frequency: "monthly", daysAgo: 70 });
+  await seedContact({
+    ownerId,
+    name: longer,
+    frequency: "monthly",
+    daysAgo: 70,
+  });
   // B: weekly, last contact 20 days ago -> due 13 days ago.
   await seedContact({
+    ownerId,
     name: shorter,
     relationship: "Коллега",
     frequency: "weekly",
@@ -120,11 +158,24 @@ test("home: the overdue block lists due contacts, longest-waiting first, above s
 test("home: marking from the block removes the contact and shows a confirmation", async ({
   page,
 }) => {
+  const ownerEmail = uniqueOwnerEmail();
+  await loginAs(page, ownerEmail);
+  const ownerId = await getOwnerId(ownerEmail);
   const run = uniq();
   const withText = `${PREFIX}${run} C Пётр`;
   const empty = `${PREFIX}${run} D Мария`;
-  await seedContact({ name: withText, frequency: "monthly", daysAgo: 40 });
-  await seedContact({ name: empty, frequency: "monthly", daysAgo: 40 });
+  await seedContact({
+    ownerId,
+    name: withText,
+    frequency: "monthly",
+    daysAgo: 40,
+  });
+  await seedContact({
+    ownerId,
+    name: empty,
+    frequency: "monthly",
+    daysAgo: 40,
+  });
 
   await page.goto("/");
   const block = page.locator("section").filter({
@@ -174,8 +225,11 @@ test("home: marking from the block removes the contact and shows a confirmation"
 test("card: choosing a frequency saves immediately, with no Save button", async ({
   page,
 }) => {
+  const ownerEmail = uniqueOwnerEmail();
+  await loginAs(page, ownerEmail);
+  const ownerId = await getOwnerId(ownerEmail);
   const name = `${PREFIX}${uniq()} E Контакт`;
-  const id = await seedContact({ name, frequency: null, daysAgo: 1 });
+  const id = await seedContact({ ownerId, name, frequency: null, daysAgo: 1 });
 
   await page.goto(`/contacts/${id}`);
   const trigger = page.locator("#frequency");
@@ -195,9 +249,17 @@ test("card: choosing a frequency saves immediately, with no Save button", async 
 test("card: an overdue contact shows the due note with the day count", async ({
   page,
 }) => {
+  const ownerEmail = uniqueOwnerEmail();
+  await loginAs(page, ownerEmail);
+  const ownerId = await getOwnerId(ownerEmail);
   const name = `${PREFIX}${uniq()} F Просрочен`;
   // weekly, last contact 20 days ago -> due 13 days ago.
-  const id = await seedContact({ name, frequency: "weekly", daysAgo: 20 });
+  const id = await seedContact({
+    ownerId,
+    name,
+    frequency: "weekly",
+    daysAgo: 20,
+  });
 
   await page.goto(`/contacts/${id}`);
   await expect(page.getByText("Последнее общение:")).toBeVisible();
@@ -207,9 +269,17 @@ test("card: an overdue contact shows the due note with the day count", async ({
 test("card: a contact in time shows when to get in touch next", async ({
   page,
 }) => {
+  const ownerEmail = uniqueOwnerEmail();
+  await loginAs(page, ownerEmail);
+  const ownerId = await getOwnerId(ownerEmail);
   const name = `${PREFIX}${uniq()} G Свежий`;
   // monthly, last contact 3 days ago -> not due yet.
-  const id = await seedContact({ name, frequency: "monthly", daysAgo: 3 });
+  const id = await seedContact({
+    ownerId,
+    name,
+    frequency: "monthly",
+    daysAgo: 3,
+  });
 
   await page.goto(`/contacts/${id}`);
   await expect(page.getByText("Последнее общение:")).toBeVisible();
@@ -220,8 +290,11 @@ test("card: a contact in time shows when to get in touch next", async ({
 test("card: without a frequency only the last-contact date is shown", async ({
   page,
 }) => {
+  const ownerEmail = uniqueOwnerEmail();
+  await loginAs(page, ownerEmail);
+  const ownerId = await getOwnerId(ownerEmail);
   const name = `${PREFIX}${uniq()} H БезЧастоты`;
-  const id = await seedContact({ name, frequency: null, daysAgo: 5 });
+  const id = await seedContact({ ownerId, name, frequency: null, daysAgo: 5 });
 
   await page.goto(`/contacts/${id}`);
   await expect(page.getByText("Последнее общение:")).toBeVisible();

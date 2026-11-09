@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { and, eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { contacts, notes, groups, contactGroups } from "@/db/schema";
+import { requireUser } from "@/lib/session";
 import {
   formatShortDate,
   isContactFrequency,
@@ -15,31 +16,37 @@ import {
 // the group helpers so they can run inside a larger transaction.
 type DbTransaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-// Compare two group names the same way everywhere: case-insensitive and folding
-// "ё" into "е" (matching contact search). Keeping this in one place guarantees
-// the runtime "find" check and the functional unique index agree.
-function sameNormalizedName(name: string) {
-  return sql`translate(lower(${groups.name}), 'ё', 'е') = translate(lower(${name}), 'ё', 'е')`;
+// Compare two group names the same way everywhere, within one owner:
+// case-insensitive and folding "ё" into "е" (matching contact search). Keeping
+// this in one place guarantees the runtime "find" check and the functional
+// unique index agree.
+function sameNormalizedName(ownerId: string, name: string) {
+  return and(
+    eq(groups.ownerId, ownerId),
+    sql`translate(lower(${groups.name}), 'ё', 'е') = translate(lower(${name}), 'ё', 'е')`,
+  );
 }
 
-// Find a group by its normalized name, or create it; returns the group id.
-// `name` must already be trimmed and non-empty. The unique index is the final
-// guard against a race: if a concurrent insert wins, onConflictDoNothing yields
-// no row and we fall back to a second lookup.
+// Find a group by its normalized name within this owner, or create it; returns
+// the group id. `name` must already be trimmed and non-empty. The unique index
+// (owner_id, normalized name) is the final guard against a race: if a
+// concurrent insert wins, onConflictDoNothing yields no row and we fall back to
+// a second lookup.
 async function findOrCreateGroup(
   tx: DbTransaction,
+  ownerId: string,
   name: string,
 ): Promise<number> {
   const [existing] = await tx
     .select({ id: groups.id })
     .from(groups)
-    .where(sameNormalizedName(name))
+    .where(sameNormalizedName(ownerId, name))
     .limit(1);
   if (existing) return existing.id;
 
   const [created] = await tx
     .insert(groups)
-    .values({ name })
+    .values({ ownerId, name })
     .onConflictDoNothing()
     .returning({ id: groups.id });
   if (created) return created.id;
@@ -47,7 +54,7 @@ async function findOrCreateGroup(
   const [raced] = await tx
     .select({ id: groups.id })
     .from(groups)
-    .where(sameNormalizedName(name))
+    .where(sameNormalizedName(ownerId, name))
     .limit(1);
   return raced.id;
 }
@@ -72,6 +79,7 @@ export async function createContact(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  const user = await requireUser();
   const name = String(formData.get("name") ?? "").trim();
   const relationship = String(formData.get("relationship") ?? "").trim();
   const phone = String(formData.get("phone") ?? "").trim();
@@ -93,6 +101,7 @@ export async function createContact(
       const [created] = await tx
         .insert(contacts)
         .values({
+          ownerId: user.id,
           name,
           relationship: relationship || null,
           phone: phone || null,
@@ -105,7 +114,7 @@ export async function createContact(
       // transaction. onConflictDoNothing keeps it safe if the same name was
       // chosen twice (different casing/"ё").
       for (const groupName of groupNames) {
-        const groupId = await findOrCreateGroup(tx, groupName);
+        const groupId = await findOrCreateGroup(tx, user.id, groupName);
         await tx
           .insert(contactGroups)
           .values({ contactId: created.id, groupId })
@@ -128,6 +137,7 @@ export async function addNote(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  const user = await requireUser();
   const contactId = Number(formData.get("contactId"));
   const body = String(formData.get("body") ?? "").trim();
 
@@ -140,7 +150,7 @@ export async function addNote(
     const [contact] = await db
       .select({ name: contacts.name, frequency: contacts.frequency })
       .from(contacts)
-      .where(eq(contacts.id, contactId))
+      .where(and(eq(contacts.id, contactId), eq(contacts.ownerId, user.id)))
       .limit(1);
     if (!contact) {
       return { error: "Контакт не найден" };
@@ -170,6 +180,7 @@ export async function setContactFrequency(
   contactId: number,
   value: string,
 ): Promise<ActionState> {
+  const user = await requireUser();
   if (!Number.isInteger(contactId)) {
     return { error: "Контакт не найден" };
   }
@@ -178,10 +189,14 @@ export async function setContactFrequency(
   }
 
   try {
-    await db
+    const [updated] = await db
       .update(contacts)
       .set({ frequency: isContactFrequency(value) ? value : null })
-      .where(eq(contacts.id, contactId));
+      .where(and(eq(contacts.id, contactId), eq(contacts.ownerId, user.id)))
+      .returning({ id: contacts.id });
+    if (!updated) {
+      return { error: "Контакт не найден" };
+    }
   } catch (error) {
     logDbError("setContactFrequency", error);
     return { error: "Не удалось сохранить частоту. Попробуйте ещё раз." };
@@ -196,6 +211,7 @@ export async function deleteContact(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  const user = await requireUser();
   const contactId = Number(formData.get("contactId"));
 
   if (!Number.isInteger(contactId)) {
@@ -204,7 +220,9 @@ export async function deleteContact(
 
   try {
     // Notes are removed automatically by the ON DELETE cascade foreign key.
-    await db.delete(contacts).where(eq(contacts.id, contactId));
+    await db
+      .delete(contacts)
+      .where(and(eq(contacts.id, contactId), eq(contacts.ownerId, user.id)));
   } catch (error) {
     logDbError("deleteContact", error);
     return { error: "Не удалось удалить контакт. Попробуйте ещё раз." };
@@ -218,6 +236,7 @@ export async function addGroupToContact(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  const user = await requireUser();
   const contactId = Number(formData.get("contactId"));
   const name = String(formData.get("name") ?? "").trim();
 
@@ -229,8 +248,17 @@ export async function addGroupToContact(
   }
 
   try {
+    const [contact] = await db
+      .select({ id: contacts.id })
+      .from(contacts)
+      .where(and(eq(contacts.id, contactId), eq(contacts.ownerId, user.id)))
+      .limit(1);
+    if (!contact) {
+      return { error: "Контакт не найден" };
+    }
+
     await db.transaction(async (tx) => {
-      const groupId = await findOrCreateGroup(tx, name);
+      const groupId = await findOrCreateGroup(tx, user.id, name);
       // Idempotent: linking the same group again is a no-op (composite PK).
       await tx
         .insert(contactGroups)
@@ -252,6 +280,7 @@ export async function removeGroupFromContact(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  const user = await requireUser();
   const contactId = Number(formData.get("contactId"));
   const groupId = Number(formData.get("groupId"));
 
@@ -260,6 +289,15 @@ export async function removeGroupFromContact(
   }
 
   try {
+    const [contact] = await db
+      .select({ id: contacts.id })
+      .from(contacts)
+      .where(and(eq(contacts.id, contactId), eq(contacts.ownerId, user.id)))
+      .limit(1);
+    if (!contact) {
+      return { error: "Контакт не найден" };
+    }
+
     // Only the link is removed; the group and the contact both stay.
     await db
       .delete(contactGroups)
@@ -284,6 +322,7 @@ export async function createGroup(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  const user = await requireUser();
   const name = String(formData.get("name") ?? "").trim();
 
   if (!name) {
@@ -291,10 +330,10 @@ export async function createGroup(
   }
 
   try {
-    // Find-or-create by normalized name: an existing name (even in another case)
-    // does not create a duplicate.
+    // Find-or-create by normalized name within this owner: an existing name
+    // (even in another case) does not create a duplicate.
     await db.transaction(async (tx) => {
-      await findOrCreateGroup(tx, name);
+      await findOrCreateGroup(tx, user.id, name);
     });
   } catch (error) {
     logDbError("createGroup", error);
@@ -310,6 +349,7 @@ export async function renameGroup(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  const user = await requireUser();
   const groupId = Number(formData.get("groupId"));
   const name = String(formData.get("name") ?? "").trim();
 
@@ -321,18 +361,28 @@ export async function renameGroup(
   }
 
   try {
-    // Reject a name already taken by a different group (case-insensitive, "ё"="е")
-    // with a clear message instead of a raw unique-index error.
+    // Reject a name already taken by a different group of this owner
+    // (case-insensitive, "ё"="е") with a clear message instead of a raw
+    // unique-index error.
     const [clash] = await db
       .select({ id: groups.id })
       .from(groups)
-      .where(and(sameNormalizedName(name), sql`${groups.id} <> ${groupId}`))
+      .where(
+        and(sameNormalizedName(user.id, name), sql`${groups.id} <> ${groupId}`),
+      )
       .limit(1);
     if (clash) {
       return { error: "Группа с таким названием уже есть" };
     }
 
-    await db.update(groups).set({ name }).where(eq(groups.id, groupId));
+    const [updated] = await db
+      .update(groups)
+      .set({ name })
+      .where(and(eq(groups.id, groupId), eq(groups.ownerId, user.id)))
+      .returning({ id: groups.id });
+    if (!updated) {
+      return { error: "Группа не найдена" };
+    }
   } catch (error) {
     logDbError("renameGroup", error);
     return { error: "Не удалось переименовать группу. Попробуйте ещё раз." };
@@ -347,6 +397,7 @@ export async function deleteGroup(
   _prevState: ActionState,
   formData: FormData,
 ): Promise<ActionState> {
+  const user = await requireUser();
   const groupId = Number(formData.get("groupId"));
 
   if (!Number.isInteger(groupId)) {
@@ -356,7 +407,9 @@ export async function deleteGroup(
   try {
     // Contact links are removed automatically by the ON DELETE cascade; the
     // contacts themselves stay.
-    await db.delete(groups).where(eq(groups.id, groupId));
+    await db
+      .delete(groups)
+      .where(and(eq(groups.id, groupId), eq(groups.ownerId, user.id)));
   } catch (error) {
     logDbError("deleteGroup", error);
     return { error: "Не удалось удалить группу. Попробуйте ещё раз." };
