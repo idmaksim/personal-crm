@@ -62,6 +62,13 @@ export const auth = betterAuth({
   plugins: [
     magicLink({
       expiresIn: MAGIC_LINK_EXPIRES_IN_SECONDS,
+      // Better Auth's own crude, IP-based backstop (shared between requesting
+      // and verifying a link); the real "3 per address per 10 minutes" rule
+      // lives in magic-link-limit.ts below. The plugin's own default (5 per
+      // 60s) is tight enough that our own e2e suite — several distinct users
+      // logging in back to back from one IP — trips over it; raised with
+      // headroom for that, while still bounding a single IP.
+      rateLimit: { window: 60, max: 30 },
       sendMagicLink: async ({ email, url, token }) => {
         // Defense in depth: the /login form already checks this before even
         // requesting a link, but a request straight to this route must be
