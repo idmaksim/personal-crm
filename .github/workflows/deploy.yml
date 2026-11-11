@@ -1,12 +1,16 @@
 name: Deploy
 
-# Push to main -> build image -> push to GHCR -> deploy to the server.
+# Push to main -> build image -> deploy to prod -> deploy to the test stand.
+# Prod goes first and does not depend on the stand: if the stand fails, prod is
+# already deployed. The stand reseeds its database from the just-deployed prod.
 on:
   push:
     branches: [main]
   workflow_dispatch: {}
 
-# Never run two deploys at once; let a running one finish.
+# Never run two deploys at once; let a running one finish. This one group covers
+# the whole run (build + prod + stand), so two deploys to the stand never
+# overlap either.
 concurrency:
   group: deploy-main
   cancel-in-progress: false
@@ -16,9 +20,11 @@ permissions:
   packages: write
 
 jobs:
-  deploy:
+  build:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    outputs:
+      image: ${{ steps.img.outputs.image }}
     steps:
       - name: Checkout
         uses: actions/checkout@v6
@@ -47,14 +53,22 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Deploy to server
+  deploy-prod:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Deploy to server (production)
         env:
           DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
           SERVER_HOST: ${{ secrets.SERVER_HOST }}
           SERVER_USER: ${{ secrets.SERVER_USER }}
           GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GHCR_USER: ${{ github.actor }}
-          IMAGE: ${{ steps.img.outputs.image }}
+          IMAGE: ${{ needs.build.outputs.image }}
         run: |
           set -euo pipefail
           mkdir -p ~/.ssh
@@ -62,18 +76,55 @@ jobs:
           chmod 600 ~/.ssh/id_deploy
           ssh-keyscan -H "$SERVER_HOST" >> ~/.ssh/known_hosts 2>/dev/null
 
-          # Copy the whole deploy/ folder to the server, so new scripts (e.g.
-          # restore.sh) travel automatically — no workflow change needed per
-          # script. scp only adds/overwrites files; it does NOT delete anything
-          # already on the server, so ~/deploy/.env and ~/deploy/backups/ (both
-          # server-only, not in the repo) are left untouched.
+          # Copy the whole deploy/ folder to the server, so new scripts travel
+          # automatically — no workflow change needed per script. scp only
+          # adds/overwrites files; it does NOT delete anything already on the
+          # server, so ~/deploy/.env, ~/deploy/.env.staging and ~/deploy/backups/
+          # (all server-only, not in the repo) are left untouched.
           ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes \
             "$SERVER_USER@$SERVER_HOST" "mkdir -p ~/deploy"
           scp -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes -r \
             deploy/. \
             "$SERVER_USER@$SERVER_HOST:~/deploy/"
 
-          # Log in to GHCR on the server (to pull the private image), then deploy.
+          # Log in to GHCR on the server (to pull the private image), then deploy prod.
           ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes \
             "$SERVER_USER@$SERVER_HOST" \
             "set -e; echo '$GHCR_TOKEN' | docker login ghcr.io -u '$GHCR_USER' --password-stdin >/dev/null; bash ~/deploy/deploy.sh '$IMAGE'"
+
+  deploy-staging:
+    needs: [build, deploy-prod]
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Deploy to server (test stand)
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+          IMAGE: ${{ needs.build.outputs.image }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -H "$SERVER_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+          # deploy-prod already copied deploy/ to the server in this run; copy
+          # again so a re-run of only this job still has the latest scripts.
+          ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes \
+            "$SERVER_USER@$SERVER_HOST" "mkdir -p ~/deploy"
+          scp -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes -r \
+            deploy/. \
+            "$SERVER_USER@$SERVER_HOST:~/deploy/"
+
+          # Deploy the stand. deploy.sh skips cleanly if the stand is not
+          # configured yet (no ~/deploy/.env.staging on the server).
+          ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes \
+            "$SERVER_USER@$SERVER_HOST" \
+            "set -e; echo '$GHCR_TOKEN' | docker login ghcr.io -u '$GHCR_USER' --password-stdin >/dev/null; bash ~/deploy/deploy.sh '$IMAGE' staging"

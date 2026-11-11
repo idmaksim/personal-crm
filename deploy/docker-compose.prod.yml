@@ -1,15 +1,24 @@
-# Production stack on the server. Run with project name "prod":
-#   docker compose -p prod -f docker-compose.prod.yml ...
+# App stack on the server. One file serves two environments; deploy.sh passes
+# the environment's values as variables (project name, container names, port,
+# env file, memory limits). The defaults below reproduce production exactly, so
+# running this file with no extra variables behaves as it always has:
 #
-# Secrets live in ./.env (next to this file), which is created on the server by
-# hand and is NOT in git. APP_IMAGE is passed by deploy.sh at deploy time.
+#   # production (project "prod"):
+#   docker compose -p prod -f docker-compose.prod.yml ...
+#   # test stand (project "test"): deploy.sh sets APP_CONTAINER, DB_CONTAINER,
+#   # APP_PORT=3100, ENV_FILE=.env.staging, *_MEM_LIMIT, and -p test.
+#
+# Secrets live in the env file next to this one (ENV_FILE, default .env), which
+# is created on the server by hand and is NOT in git. APP_IMAGE is passed by
+# deploy.sh at deploy time. A *_MEM_LIMIT of 0 (the prod default) means no limit.
 
 services:
   # The app's own database, reachable only inside this compose network.
   postgres:
     image: postgres:18
-    container_name: prod-postgres
+    container_name: ${DB_CONTAINER:-prod-postgres}
     restart: unless-stopped
+    mem_limit: ${DB_MEM_LIMIT:-0}
     environment:
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
@@ -30,11 +39,12 @@ services:
   # The web app. Published only on localhost; nginx proxies to it.
   app:
     image: ${APP_IMAGE}
-    container_name: prod-app
+    container_name: ${APP_CONTAINER:-prod-app}
     restart: unless-stopped
-    env_file: .env
+    mem_limit: ${APP_MEM_LIMIT:-0}
+    env_file: ${ENV_FILE:-.env}
     ports:
-      - "127.0.0.1:3000:3000"
+      - "127.0.0.1:${APP_PORT:-3000}:3000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -49,7 +59,7 @@ services:
   migrate:
     image: ${APP_IMAGE}
     profiles: ["tools"]
-    env_file: .env
+    env_file: ${ENV_FILE:-.env}
     command: ["node", "src/db/migrate.mjs"]
     depends_on:
       postgres:

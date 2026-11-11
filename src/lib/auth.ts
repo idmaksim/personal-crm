@@ -34,6 +34,14 @@ async function revokeOtherMagicLinks(email: string, keepToken: string) {
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, { provider: "pg" }),
+  // Multi-environment safety (prod + test stand share nothing):
+  // - The magic-link URL in the email is built from baseURL, so each
+  //   environment's own BETTER_AUTH_URL makes the link point back at the
+  //   environment where sign-in was requested. Do not derive the link from
+  //   anything else.
+  // - The session cookie is left host-only (no `advanced.crossSubDomainCookies`
+  //   and no cookie `domain`), so it stays on its own subdomain and never spans
+  //   the shared parent domain. Do not add a cookie domain.
   baseURL: process.env.BETTER_AUTH_URL,
   trustedOrigins: process.env.BETTER_AUTH_URL
     ? [process.env.BETTER_AUTH_URL]
