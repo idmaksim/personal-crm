@@ -1,0 +1,78 @@
+name: Deploy prod
+
+# Manual production deploy — the button. Prod is NEVER deployed automatically on
+# merge; you run this workflow by hand (Actions -> Deploy prod -> Run workflow).
+# It builds the current main and deploys it to production. Run it on the main
+# branch (the default) to deploy the latest merged code.
+on:
+  workflow_dispatch: {}
+
+# Share the concurrency group with "Deploy stand" so a prod deploy and a stand
+# deploy (which reseeds from prod's database) never run at the same time.
+concurrency:
+  group: deploy-server
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+  packages: write
+
+jobs:
+  build:
+    uses: ./.github/workflows/build.yml
+
+  deploy-prod:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Set up SSH
+        env:
+          DEPLOY_SSH_KEY: ${{ secrets.DEPLOY_SSH_KEY }}
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "$DEPLOY_SSH_KEY" > ~/.ssh/id_deploy
+          chmod 600 ~/.ssh/id_deploy
+          ssh-keyscan -H "$SERVER_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Deploy to server (production)
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+          IMAGE: ${{ needs.build.outputs.image }}
+        run: |
+          set -euo pipefail
+
+          # Copy the whole deploy/ folder to the server, so new scripts travel
+          # automatically. scp only adds/overwrites files; it does NOT delete
+          # anything already on the server, so ~/deploy/.env, ~/deploy/.env.staging
+          # and ~/deploy/backups/ (all server-only, not in the repo) are untouched.
+          ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes \
+            "$SERVER_USER@$SERVER_HOST" "mkdir -p ~/deploy"
+          scp -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes -r \
+            deploy/. \
+            "$SERVER_USER@$SERVER_HOST:~/deploy/"
+
+          # Log in to GHCR on the server (to pull the private image), then deploy prod.
+          ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes \
+            "$SERVER_USER@$SERVER_HOST" \
+            "set -e; echo '$GHCR_TOKEN' | docker login ghcr.io -u '$GHCR_USER' --password-stdin >/dev/null; bash ~/deploy/deploy.sh '$IMAGE'"
+
+      - name: Install/refresh the daily backup timer
+        env:
+          SERVER_HOST: ${{ secrets.SERVER_HOST }}
+          SERVER_USER: ${{ secrets.SERVER_USER }}
+        run: |
+          set -euo pipefail
+          # Idempotent: installs the systemd service+timer (or refreshes them if
+          # the unit files changed) so the prod database is backed up once a day.
+          ssh -i ~/.ssh/id_deploy -o StrictHostKeyChecking=yes \
+            "$SERVER_USER@$SERVER_HOST" \
+            "set -e; bash ~/deploy/install-backup-timer.sh"
