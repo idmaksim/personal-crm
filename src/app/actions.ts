@@ -11,6 +11,7 @@ import {
   isContactFrequency,
   nextContactDate,
 } from "@/lib/frequency";
+import { parseBirthdayInput } from "@/lib/birthdays";
 
 // A Drizzle transaction handle, inferred from db.transaction's callback. Used by
 // the group helpers so they can run inside a larger transaction.
@@ -95,6 +96,15 @@ export async function createContact(
     return { error: "Укажите имя контакта" };
   }
 
+  const birthday = parseBirthdayInput({
+    day: String(formData.get("birthDay") ?? ""),
+    month: String(formData.get("birthMonth") ?? ""),
+    year: String(formData.get("birthYear") ?? ""),
+  });
+  if (!birthday.ok) {
+    return { error: birthday.error };
+  }
+
   let createdId: number;
   try {
     createdId = await db.transaction(async (tx) => {
@@ -107,6 +117,9 @@ export async function createContact(
           phone: phone || null,
           email: email || null,
           frequency: isContactFrequency(frequency) ? frequency : null,
+          birthDay: birthday.value.birthDay,
+          birthMonth: birthday.value.birthMonth,
+          birthYear: birthday.value.birthYear,
         })
         .returning({ id: contacts.id });
 
@@ -200,6 +213,46 @@ export async function setContactFrequency(
   } catch (error) {
     logDbError("setContactFrequency", error);
     return { error: "Не удалось сохранить частоту. Попробуйте ещё раз." };
+  }
+
+  revalidatePath("/");
+  revalidatePath(`/contacts/${contactId}`);
+  return undefined;
+}
+
+// Set or clear a contact's date of birth from the card. Called directly (not
+// via a form action) so the save does not trigger React's post-submit form
+// reset. Empty fields clear the birthday.
+export async function setBirthday(
+  contactId: number,
+  input: { day?: string | null; month?: string | null; year?: string | null },
+): Promise<ActionState> {
+  const user = await requireUser();
+  if (!Number.isInteger(contactId)) {
+    return { error: "Контакт не найден" };
+  }
+
+  const birthday = parseBirthdayInput(input);
+  if (!birthday.ok) {
+    return { error: birthday.error };
+  }
+
+  try {
+    const [updated] = await db
+      .update(contacts)
+      .set({
+        birthDay: birthday.value.birthDay,
+        birthMonth: birthday.value.birthMonth,
+        birthYear: birthday.value.birthYear,
+      })
+      .where(and(eq(contacts.id, contactId), eq(contacts.ownerId, user.id)))
+      .returning({ id: contacts.id });
+    if (!updated) {
+      return { error: "Контакт не найден" };
+    }
+  } catch (error) {
+    logDbError("setBirthday", error);
+    return { error: "Не удалось сохранить дату рождения. Попробуйте ещё раз." };
   }
 
   revalidatePath("/");

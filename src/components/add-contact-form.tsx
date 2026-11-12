@@ -6,12 +6,18 @@ import { createContact, type ActionState } from "@/app/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { FrequencySelect } from "@/components/frequency-select";
+import {
+  BirthdayInput,
+  EMPTY_BIRTHDAY,
+  type BirthdayFields,
+} from "@/components/birthday-input";
 import { GroupSelectField } from "@/components/group-select-field";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 
 export function AddContactForm({ allGroups }: { allGroups: string[] }) {
   const [open, setOpen] = useState(false);
+  const [birthday, setBirthday] = useState<BirthdayFields>(EMPTY_BIRTHDAY);
   const [state, formAction, pending] = useActionState<ActionState, FormData>(
     createContact,
     undefined,
@@ -66,6 +72,8 @@ export function AddContactForm({ allGroups }: { allGroups: string[] }) {
             <Label htmlFor="frequency">Как часто общаться</Label>
             <FrequencySelect id="frequency" name="frequency" defaultValue="" />
           </div>
+
+          <BirthdayInput value={birthday} onChange={setBirthday} />
 
           <GroupSelectField allGroups={allGroups} />
 
