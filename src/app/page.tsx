@@ -21,6 +21,8 @@ import { GroupFilter } from "@/components/group-filter";
 import { Avatar } from "@/components/avatar";
 import { OverdueContacts } from "@/components/overdue-contacts";
 import { getOverdueContacts } from "@/lib/keep-in-touch";
+import { UpcomingBirthdays } from "@/components/upcoming-birthdays";
+import { getUpcomingBirthdays } from "@/lib/birthdays";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 
@@ -202,6 +204,7 @@ export default async function Home({
   }
 
   const overdue = await getOverdueContacts(user.id);
+  const upcomingBirthdays = await getUpcomingBirthdays(user.id);
 
   const buildHref = (targetPage: number) => {
     const params = new URLSearchParams();
@@ -218,6 +221,8 @@ export default async function Home({
         <h1 className="text-2xl font-semibold">Контакты</h1>
         <AddContactForm allGroups={allGroups.map((g) => g.name)} />
       </div>
+
+      <UpcomingBirthdays items={upcomingBirthdays} />
 
       <OverdueContacts contacts={overdue} />
 

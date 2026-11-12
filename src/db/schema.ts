@@ -1,6 +1,7 @@
 import { sql } from "drizzle-orm";
 import {
   boolean,
+  check,
   pgEnum,
   pgTable,
   serial,
@@ -135,6 +136,13 @@ export const contacts = pgTable(
     phone: text("phone"),
     email: text("email"),
     frequency: contactFrequency("frequency"),
+    // Optional date of birth. Day and month are always set together (one is the
+    // birthday); the year is optional on its own (many people only know the
+    // day and month). Day-in-month validity (no 31 Apr) is checked in the
+    // server action; this table only guards the ranges and the pairing below.
+    birthDay: integer("birth_day"),
+    birthMonth: integer("birth_month"),
+    birthYear: integer("birth_year"),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -142,6 +150,14 @@ export const contacts = pgTable(
   (table) => ({
     nameIdx: index("contacts_name_idx").on(table.name),
     ownerIdx: index("contacts_owner_id_idx").on(table.ownerId),
+    birthdayValid: check(
+      "contacts_birthday_valid",
+      sql`(${table.birthDay} is null) = (${table.birthMonth} is null)
+        and (${table.birthYear} is null or ${table.birthDay} is not null)
+        and (${table.birthDay} is null or ${table.birthDay} between 1 and 31)
+        and (${table.birthMonth} is null or ${table.birthMonth} between 1 and 12)
+        and (${table.birthYear} is null or ${table.birthYear} between 1900 and 2100)`,
+    ),
   }),
 );
 

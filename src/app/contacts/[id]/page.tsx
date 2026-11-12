@@ -7,6 +7,7 @@ import { contacts, notes, groups, contactGroups } from "@/db/schema";
 import { requireUser } from "@/lib/session";
 import { NoteForm } from "@/components/note-form";
 import { ContactFrequencyForm } from "@/components/contact-frequency-form";
+import { BirthdayForm } from "@/components/birthday-form";
 import { ContactGroupsEditor } from "@/components/contact-groups-editor";
 import { getLastContactAt } from "@/lib/keep-in-touch";
 import {
@@ -160,6 +161,12 @@ export default async function ContactPage({
               )
             ) : null}
           </div>
+          <BirthdayForm
+            contactId={contact.id}
+            birthDay={contact.birthDay}
+            birthMonth={contact.birthMonth}
+            birthYear={contact.birthYear}
+          />
         </CardContent>
       </Card>
 

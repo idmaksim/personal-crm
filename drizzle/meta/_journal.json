@@ -36,6 +36,13 @@
       "when": 1794051491004,
       "tag": "0004_complete_sinister_six",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1794498227960,
+      "tag": "0005_sleepy_jamie_braddock",
+      "breakpoints": true
     }
   ]
 }
