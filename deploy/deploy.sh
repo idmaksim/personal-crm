@@ -77,9 +77,6 @@ fi
 export APP_IMAGE="$IMAGE"
 COMPOSE=(docker compose -p "$PROJECT" -f docker-compose.prod.yml)
 
-BACKUP_DIR="$DEPLOY_DIR/backups"
-BACKUPS_TO_KEEP=10
-
 # Read PUBLIC_APP_URL from the env file for the public smoke test below. We grep
 # just this one key instead of sourcing the file, since it also holds secrets
 # whose values are not safe to eval as shell.
@@ -108,26 +105,13 @@ if [ "$db_ready" != "1" ]; then
   exit 1
 fi
 
-# Back up the database BEFORE migrations touch it (production only). The backup
-# file is named after the app version running right now (before this deploy), so
-# each backup is tied to the release it was taken from. On the very first deploy
-# there is no running app yet, so we record the version as "none".
+# Back up the database BEFORE migrations touch it (production only). backup.sh
+# names the file after the app version running right now, prunes old backups, and
+# exits non-zero on failure — which aborts this deploy before migrations run.
+# The stand (DO_BACKUP=0) is skipped: its data is disposable.
 if [ "$DO_BACKUP" = "1" ]; then
   echo "==> Backing up the database (before migrations)"
-  PREV_VERSION="$(docker inspect --format '{{.Config.Image}}' "$APP_CONTAINER" 2>/dev/null | sed 's#.*:##' || true)"
-  if [ -z "$PREV_VERSION" ]; then PREV_VERSION="none"; fi
-  mkdir -p "$BACKUP_DIR"
-  BACKUP_FILE="$BACKUP_DIR/backup_$(date +%Y%m%d-%H%M%S)_${PREV_VERSION}.dump"
-  # Dump from inside the container, reading DB credentials from the container's
-  # own environment, so this script never has to read secrets from the env file.
-  # -Fc = custom format: compressed and restored cleanly by pg_restore.
-  if ! docker exec "$DB_CONTAINER" sh -c \
-      'pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc' > "$BACKUP_FILE"; then
-    echo "BACKUP FAILED — aborting deploy before migrations run." >&2
-    rm -f "$BACKUP_FILE"
-    exit 1
-  fi
-  echo "    Saved backup: $BACKUP_FILE"
+  bash "$DEPLOY_DIR/backup.sh"
 fi
 
 # Reseed the stand's database from prod (staging only). We stream a consistent
@@ -211,14 +195,6 @@ docker images "$REPO" --format '{{.CreatedAt}}|{{.ID}}' \
   | xargs -r docker rmi -f 2>/dev/null || true
 docker image prune -f >/dev/null 2>&1 || true
 
-# Backups exist only for production; nothing to prune on the stand.
-if [ "$DO_BACKUP" = "1" ]; then
-  echo "==> Cleaning up old backups (keep the $BACKUPS_TO_KEEP newest)"
-  # List backups newest-first by name (the timestamp prefix sorts chronologically)
-  # and delete everything past the first $BACKUPS_TO_KEEP.
-  ls -1t "$BACKUP_DIR"/backup_*.dump 2>/dev/null \
-    | tail -n "+$((BACKUPS_TO_KEEP + 1))" \
-    | xargs -r rm -f
-fi
+# Old backups are pruned by backup.sh (called above for prod); nothing to do here.
 
 echo "==> Deploy complete: $IMAGE ($ENV_NAME)"

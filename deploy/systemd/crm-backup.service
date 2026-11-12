@@ -1,0 +1,13 @@
+[Unit]
+Description=Daily backup of the CRM production database
+# Only run once Docker is up (the backup talks to the prod-postgres container).
+After=docker.service
+Wants=docker.service
+
+[Service]
+Type=oneshot
+User=crmapp
+Group=crmapp
+WorkingDirectory=/home/crmapp/deploy
+ExecStart=/home/crmapp/deploy/backup.sh
+# Output goes to the systemd journal: journalctl -u crm-backup
