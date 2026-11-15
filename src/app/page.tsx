@@ -15,7 +15,7 @@ import { db } from "@/db";
 import { contacts, groups, contactGroups } from "@/db/schema";
 import { requireUser } from "@/lib/session";
 import { SearchBox } from "@/components/search-box";
-import { AddContactForm } from "@/components/add-contact-form";
+import { ContactsHeader } from "@/components/contacts-header";
 import { DeleteContactButton } from "@/components/delete-contact-button";
 import { GroupFilter } from "@/components/group-filter";
 import { Avatar } from "@/components/avatar";
@@ -217,10 +217,7 @@ export default async function Home({
 
   return (
     <div className="space-y-6">
-      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-semibold">Контакты</h1>
-        <AddContactForm allGroups={allGroups.map((g) => g.name)} />
-      </div>
+      <ContactsHeader allGroups={allGroups.map((g) => g.name)} />
 
       <UpcomingBirthdays items={upcomingBirthdays} />
 
