@@ -57,8 +57,8 @@ export function BirthdayForm({
       <BirthdayInput
         value={value}
         disabled={pending}
-        onChange={(next) => {
-          setValue(next);
+        onChange={(patch) => {
+          setValue((prev) => ({ ...prev, ...patch }));
           setError(undefined);
         }}
       />

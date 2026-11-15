@@ -73,7 +73,10 @@ export function AddContactForm({ allGroups }: { allGroups: string[] }) {
             <FrequencySelect id="frequency" name="frequency" defaultValue="" />
           </div>
 
-          <BirthdayInput value={birthday} onChange={setBirthday} />
+          <BirthdayInput
+            value={birthday}
+            onChange={(patch) => setBirthday((prev) => ({ ...prev, ...patch }))}
+          />
 
           <GroupSelectField allGroups={allGroups} />
 
