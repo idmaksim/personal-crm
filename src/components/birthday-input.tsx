@@ -47,7 +47,11 @@ export function BirthdayInput({
   disabled,
 }: {
   value: BirthdayFields;
-  onChange: (next: BirthdayFields) => void;
+  // Emits a patch for the single field that changed (not the whole object), so
+  // the parent merges it with a functional state update. Passing a merged
+  // {...value, field} here closes over a possibly-stale `value` prop, letting two
+  // quick edits (e.g. day then year) clobber each other's change.
+  onChange: (patch: Partial<BirthdayFields>) => void;
   disabled?: boolean;
 }) {
   const monthValue = value.month === "" ? MONTH_UNSET : value.month;
@@ -65,9 +69,7 @@ export function BirthdayInput({
           placeholder="День"
           aria-label="День рождения"
           value={value.day}
-          onChange={(e) =>
-            onChange({ ...value, day: digits(e.target.value, 2) })
-          }
+          onChange={(e) => onChange({ day: digits(e.target.value, 2) })}
         />
         {/* Hidden field mirrors the chosen month so a surrounding <form> submits it. */}
         <input type="hidden" name="birthMonth" value={value.month} />
@@ -75,7 +77,7 @@ export function BirthdayInput({
           value={monthValue}
           disabled={disabled}
           onValueChange={(next) =>
-            onChange({ ...value, month: next === MONTH_UNSET ? "" : next })
+            onChange({ month: next === MONTH_UNSET ? "" : next })
           }
         >
           <SelectTrigger aria-label="Месяц рождения">
@@ -97,9 +99,7 @@ export function BirthdayInput({
           placeholder="Год"
           aria-label="Год рождения (необязательно)"
           value={value.year}
-          onChange={(e) =>
-            onChange({ ...value, year: digits(e.target.value, 4) })
-          }
+          onChange={(e) => onChange({ year: digits(e.target.value, 4) })}
         />
       </div>
       <p className="text-xs text-muted-foreground">Год можно не указывать</p>
