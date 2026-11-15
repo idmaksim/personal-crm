@@ -2,8 +2,9 @@
 Description=Run the CRM production database backup once a day
 
 [Timer]
-# Every day at 03:00 server time.
-OnCalendar=*-*-* 03:00:00
+# Every day at 03:00 Moscow time (systemd converts the timezone itself, so this
+# is correct regardless of the server's own timezone).
+OnCalendar=*-*-* 03:00:00 Europe/Moscow
 # If the server was off at 03:00, run the backup as soon as it is back up.
 Persistent=true
 Unit=crm-backup.service

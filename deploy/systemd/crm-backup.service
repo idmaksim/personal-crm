@@ -9,5 +9,5 @@ Type=oneshot
 User=crmapp
 Group=crmapp
 WorkingDirectory=/home/crmapp/deploy
-ExecStart=/home/crmapp/deploy/backup.sh
+ExecStart=/home/crmapp/deploy/backup.sh daily
 # Output goes to the systemd journal: journalctl -u crm-backup
