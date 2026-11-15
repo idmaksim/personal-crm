@@ -22,6 +22,11 @@ export function SearchBox() {
     timeout.current = setTimeout(() => {
       const params = new URLSearchParams();
       if (next.trim()) params.set("q", next.trim());
+      // Keep the active group filter so search narrows within it (spec:
+      // "Фильтр работает совместно с поиском") instead of dropping it.
+      for (const id of searchParams.getAll("group")) {
+        params.append("group", id);
+      }
       startTransition(() => {
         router.replace(params.toString() ? `/?${params.toString()}` : "/");
       });
