@@ -30,11 +30,14 @@ services:
       interval: 5s
       timeout: 5s
       retries: 10
+    # Logs go to the server's systemd journal, not to a per-container json file.
+    # They survive container recreation (a deploy or rollback), and the journal's
+    # size is capped by the system (journald), so the disk does not fill up.
+    # Read them with: journalctl CONTAINER_NAME=<name> (see README).
     logging:
-      driver: json-file
+      driver: journald
       options:
-        max-size: "10m"
-        max-file: "3"
+        tag: "{{.Name}}"
 
   # The web app. Published only on localhost; nginx proxies to it.
   app:
@@ -48,11 +51,14 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    # Logs go to the server's systemd journal, not to a per-container json file.
+    # They survive container recreation (a deploy or rollback), and the journal's
+    # size is capped by the system (journald), so the disk does not fill up.
+    # Read them with: journalctl CONTAINER_NAME=<name> (see README).
     logging:
-      driver: json-file
+      driver: journald
       options:
-        max-size: "10m"
-        max-file: "3"
+        tag: "{{.Name}}"
 
   # One-shot migration runner (same image). Not started by `up`; the deploy
   # runs it explicitly with `run --rm` before starting the app.
