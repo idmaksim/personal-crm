@@ -1,5 +1,5 @@
 import "server-only";
-import { and, eq, gt } from "drizzle-orm";
+import { and, eq, gt, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { magicLinkRequests } from "@/db/schema";
 
@@ -33,9 +33,54 @@ export async function isMagicLinkRateLimited(email: string): Promise<boolean> {
   );
 }
 
-// Records that a magic-link email was actually sent, so later requests count
-// it. Called once, right when the email goes out (see src/lib/auth.ts) — never
-// from the read-only check above, or every request would count twice.
-export async function recordMagicLinkSent(email: string): Promise<void> {
-  await db.insert(magicLinkRequests).values({ email });
+// Atomically reserve a send slot: the check and the record happen as one DB
+// step, so the limit holds even when requests for one address arrive at the same
+// time. In a single transaction it takes a Postgres advisory lock keyed on the
+// address (so same-address requests queue instead of all passing the count check
+// at once), counts the sends still inside the window, and inserts a new row only
+// if the limit is not yet reached. Returns the new row's id when a slot was
+// taken — the caller may send the email, and must releaseMagicLinkSend(id) if
+// the send ultimately fails — or null when the limit is already reached. This is
+// the source of truth for the limit; the read-only check above is only for the
+// form's pre-send message.
+export async function reserveMagicLinkSend(
+  email: string,
+): Promise<number | null> {
+  const windowStart = new Date(Date.now() - WINDOW_MS);
+  return db.transaction(async (tx) => {
+    // Serialize concurrent requests for this address; the lock is held until the
+    // transaction ends.
+    await tx.execute(sql`select pg_advisory_xact_lock(hashtext(${email}))`);
+
+    const rows = await tx
+      .select({ createdAt: magicLinkRequests.createdAt })
+      .from(magicLinkRequests)
+      .where(
+        and(
+          eq(magicLinkRequests.email, email),
+          gt(magicLinkRequests.createdAt, windowStart),
+        ),
+      );
+
+    if (
+      exceedsMagicLinkLimit(
+        rows.map((r) => r.createdAt),
+        new Date(),
+      )
+    ) {
+      return null;
+    }
+
+    const [inserted] = await tx
+      .insert(magicLinkRequests)
+      .values({ email })
+      .returning({ id: magicLinkRequests.id });
+    return inserted.id;
+  });
+}
+
+// Undo a reservation when the email did not actually go out (e.g. the mailer
+// failed), so a failed attempt does not count against the limit.
+export async function releaseMagicLinkSend(id: number): Promise<void> {
+  await db.delete(magicLinkRequests).where(eq(magicLinkRequests.id, id));
 }
