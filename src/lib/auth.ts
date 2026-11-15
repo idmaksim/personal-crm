@@ -8,8 +8,8 @@ import { db } from "@/db";
 import { verification } from "@/db/schema";
 import { isValidEmail, normalizeEmail } from "@/lib/email";
 import {
-  isMagicLinkRateLimited,
-  recordMagicLinkSent,
+  releaseMagicLinkSend,
+  reserveMagicLinkSend,
 } from "@/lib/magic-link-limit";
 import { sendMail } from "@/lib/mailer";
 
@@ -78,32 +78,40 @@ export const auth = betterAuth({
       // headroom for that, while still bounding a single IP.
       rateLimit: { window: 60, max: 30 },
       sendMagicLink: async ({ email, url, token }) => {
-        // Defense in depth: the /login form already checks this before even
-        // requesting a link, but a request straight to this route must be
-        // held to the same "3 per 10 minutes" rule.
-        if (await isMagicLinkRateLimited(email)) return;
+        // Defense in depth and the real limit in one step: atomically reserve a
+        // send slot (count + record as a single DB transaction). This holds the
+        // "3 per 10 minutes" rule even for requests that arrive at the same time,
+        // and for a request made straight to this route rather than through the
+        // /login form. Past the limit there is nothing to send.
+        const reservationId = await reserveMagicLinkSend(email);
+        if (reservationId === null) return;
 
-        await revokeOtherMagicLinks(email, token);
+        try {
+          await revokeOtherMagicLinks(email, token);
 
-        await sendMail({
-          to: email,
-          subject: "Вход в Личную CRM",
-          html: `
-            <p>Чтобы войти в Личную CRM, перейдите по ссылке:</p>
-            <p><a href="${url}">Войти</a></p>
-            <p>Ссылка действует 15 минут.</p>
-            <p>Если вы не запрашивали вход — просто проигнорируйте письмо.</p>
-          `,
-          text: [
-            "Чтобы войти в Личную CRM, перейдите по ссылке:",
-            url,
-            "",
-            "Ссылка действует 15 минут.",
-            "Если вы не запрашивали вход — просто проигнорируйте письмо.",
-          ].join("\n"),
-        });
-
-        await recordMagicLinkSent(email);
+          await sendMail({
+            to: email,
+            subject: "Вход в Личную CRM",
+            html: `
+              <p>Чтобы войти в Личную CRM, перейдите по ссылке:</p>
+              <p><a href="${url}">Войти</a></p>
+              <p>Ссылка действует 15 минут.</p>
+              <p>Если вы не запрашивали вход — просто проигнорируйте письмо.</p>
+            `,
+            text: [
+              "Чтобы войти в Личную CRM, перейдите по ссылке:",
+              url,
+              "",
+              "Ссылка действует 15 минут.",
+              "Если вы не запрашивали вход — просто проигнорируйте письмо.",
+            ].join("\n"),
+          });
+        } catch (error) {
+          // The email did not go out, so free the reserved slot — a failed send
+          // must not count against the limit — and let the caller surface it.
+          await releaseMagicLinkSend(reservationId);
+          throw error;
+        }
       },
     }),
   ],
