@@ -14,6 +14,7 @@ import { ChevronLeft, ChevronRight, Mail, Phone } from "lucide-react";
 import { db } from "@/db";
 import { contacts, groups, contactGroups } from "@/db/schema";
 import { requireUser } from "@/lib/session";
+import { parseGroupIds } from "@/lib/groups";
 import { SearchBox } from "@/components/search-box";
 import { ContactsHeader } from "@/components/contacts-header";
 import { DeleteContactButton } from "@/components/delete-contact-button";
@@ -46,18 +47,6 @@ function fuzzyMatch(column: Column, pattern: string): SQL {
 function buildPattern(query: string): string {
   const escaped = query.replace(/[\\%_]/g, (ch) => `\\${ch}`);
   return `%${escaped}%`;
-}
-
-// Read the repeatable ?group param (string | string[] | undefined) into a list
-// of integer ids, dropping anything that is not a valid integer.
-function parseGroupIds(raw: string | string[] | undefined): number[] {
-  const values = raw === undefined ? [] : Array.isArray(raw) ? raw : [raw];
-  const ids: number[] = [];
-  for (const value of values) {
-    const id = Number(value);
-    if (Number.isInteger(id)) ids.push(id);
-  }
-  return ids;
 }
 
 export default async function Home({

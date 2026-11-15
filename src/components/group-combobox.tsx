@@ -7,13 +7,8 @@ import {
   dropdownPanelClassName,
 } from "@/components/ui/dropdown-panel";
 import { Input } from "@/components/ui/input";
+import { computeGroupOptions } from "@/lib/groups";
 import { cn } from "@/lib/utils";
-
-// Normalize a name for matching, mirroring the server rule (case-insensitive,
-// "ё" folded into "е").
-function normalize(name: string) {
-  return name.trim().toLowerCase().replace(/ё/g, "е");
-}
 
 type GroupComboboxProps = {
   // All existing group names, offered as suggestions.
@@ -43,16 +38,11 @@ export function GroupCombobox({
     undefined,
   );
 
-  const excludeKeys = new Set(exclude.map(normalize));
-  const valueKey = normalize(value);
-
-  const suggestions = options
-    .filter((name) => !excludeKeys.has(normalize(name)))
-    .filter((name) => (valueKey ? normalize(name).includes(valueKey) : true));
-
-  const existsExactly = options.some((name) => normalize(name) === valueKey);
-  const alreadyChosen = valueKey !== "" && excludeKeys.has(valueKey);
-  const showCreate = valueKey !== "" && !existsExactly && !alreadyChosen;
+  const { suggestions, showCreate, alreadyChosen } = computeGroupOptions({
+    options,
+    exclude,
+    value,
+  });
 
   // Items the keyboard can move through: suggestions first, then the create row.
   const itemCount = suggestions.length + (showCreate ? 1 : 0);

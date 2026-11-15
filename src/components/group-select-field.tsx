@@ -3,12 +3,8 @@
 import { useState } from "react";
 import { X } from "lucide-react";
 import { GroupCombobox } from "@/components/group-combobox";
+import { normalizeGroupName } from "@/lib/groups";
 import { Label } from "@/components/ui/label";
-
-// Normalize a name for local de-duplication, mirroring the server rule.
-function normalize(name: string) {
-  return name.trim().toLowerCase().replace(/ё/g, "е");
-}
 
 // Collects the groups chosen for a brand-new contact. The chosen names are
 // submitted as repeated hidden "groups" fields; createContact creates any
@@ -17,9 +13,9 @@ export function GroupSelectField({ allGroups }: { allGroups: string[] }) {
   const [chosen, setChosen] = useState<string[]>([]);
 
   function add(name: string) {
-    const key = normalize(name);
+    const key = normalizeGroupName(name);
     if (!key) return;
-    if (chosen.some((n) => normalize(n) === key)) return;
+    if (chosen.some((n) => normalizeGroupName(n) === key)) return;
     setChosen((prev) => [...prev, name.trim()]);
   }
 
