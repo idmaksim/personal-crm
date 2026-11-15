@@ -192,14 +192,15 @@ bash ~/deploy/restore.sh ~/deploy/backups/backup_<...>.dump
 что диск не забивается. Каждый контейнер помечен своим именем: `prod-app`,
 `prod-postgres`, `test-app`, `test-postgres`.
 
-Читать на сервере (`ssh crm`):
+Читать на сервере (`ssh crm`). Пользователь `crmapp` не входит в группу
+`systemd-journal`, поэтому логи контейнеров читаются через `sudo` (он без пароля):
 
 ```bash
-journalctl CONTAINER_NAME=prod-app -n 200            # последние 200 строк прода
-journalctl CONTAINER_NAME=prod-app -f                # следить в реальном времени
-journalctl CONTAINER_NAME=prod-app --since "1 hour ago"   # за последний час
-journalctl CONTAINER_NAME=prod-app -p warning --since today  # только ошибки/предупреждения
-journalctl CONTAINER_NAME=test-app --since "1 hour ago"      # то же для тест-стенда
+sudo journalctl CONTAINER_NAME=prod-app -n 200            # последние 200 строк прода
+sudo journalctl CONTAINER_NAME=prod-app -f                # следить в реальном времени
+sudo journalctl CONTAINER_NAME=prod-app --since "1 hour ago"   # за последний час
+sudo journalctl CONTAINER_NAME=prod-app -p warning --since today  # только ошибки/предупреждения
+sudo journalctl CONTAINER_NAME=test-app --since "1 hour ago"      # то же для тест-стенда
 ```
 
 Агент читает логи сам по ssh, когда попросите, например:
