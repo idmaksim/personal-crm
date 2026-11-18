@@ -33,7 +33,24 @@ fi
 
 BACKUP_DIR="$DEPLOY_DIR/backups"
 DB_CONTAINER="prod-postgres"
+APP_CONTAINER="prod-app"
 COMPOSE=(docker compose -p prod -f docker-compose.prod.yml)
+
+# The compose file sets the app image from $APP_IMAGE with no default (deploy.sh
+# exports it at deploy time), so EVERY `docker compose` call below needs it set —
+# otherwise the project fails to load with "service app has neither an image nor
+# a build context specified: invalid compose project" and this script aborts
+# before doing anything. A restore never changes the app version, so we read the
+# image of the current app container and reuse it; the app comes back on the same
+# version. `docker inspect` reads the image from a stopped container too.
+if ! APP_IMAGE="$(docker inspect --format '{{.Config.Image}}' "$APP_CONTAINER" 2>/dev/null)" \
+    || [ -z "$APP_IMAGE" ]; then
+  echo "ERROR: could not read the current app image from container '$APP_CONTAINER'." >&2
+  echo "The app container must exist so the restore can bring it back on the same" >&2
+  echo "version. Deploy the app first, then re-run restore." >&2
+  exit 1
+fi
+export APP_IMAGE
 
 # Make sure the database container is up (we restore through it). This does not
 # touch the app.
